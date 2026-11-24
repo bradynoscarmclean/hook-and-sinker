@@ -1,0 +1,906 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rare Catch</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Pixelify+Sans:wght@400;700&display=swap">
+<style>
+/* Layout: pixel fishing stage on top (the hook keeps sinking as your score grows), one chunky pixel panel below. Single deliberate night-lake look. */
+:root {
+  --night: #0b1424;
+  --panel: #14243a;
+  --panel-2: #1c3150;
+  --edge: #050912;
+  --hi: #2b4870;
+  --shade: #0c1729;
+  --cream: #f4ead2;
+  --muted: #9fb3c8;
+  --accent: #ffb02e;
+  --accent-d: #b86f00;
+  --worm: #ff7aa2;
+  --bad: #ff5f6d;
+  /* Answer depth follows the usual game rarity ladder: gray, green, blue, purple, orange, gold. */
+  --t1: #b8c2cc; --t2: #5fd068; --t3: #4aa3ff; --t4: #b06bff; --t5: #ff9a3c; --t6: #ffd23f;
+  --pixel: "Press Start 2P", "Courier New", monospace;
+  --body: "Pixelify Sans", "Trebuchet MS", system-ui, sans-serif;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--night);
+  background-image: radial-gradient(var(--panel) 1px, transparent 1px);
+  background-size: 8px 8px;
+  color: var(--cream);
+  font-family: var(--body);
+  font-size: 18px;
+  line-height: 1.45;
+}
+.wrap {
+  max-width: 720px; margin: 0 auto;
+  padding-block: 18px 56px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: flex; flex-direction: column; gap: 16px;
+}
+.top { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.logo { font-family: var(--pixel); font-size: 22px; letter-spacing: 1px; margin: 0; color: var(--cream); text-shadow: 3px 3px 0 var(--edge); }
+.logo span { color: var(--accent); }
+.topright { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.stat { font-family: var(--pixel); font-size: 10px; color: var(--muted); }
+
+.box {
+  background: var(--panel);
+  border: 4px solid var(--edge);
+  box-shadow: inset 4px 4px 0 var(--hi), inset -4px -4px 0 var(--shade), 4px 4px 0 var(--edge);
+  padding: 18px;
+  display: flex; flex-direction: column; gap: 14px;
+}
+.stage { position: relative; border: 4px solid var(--edge); box-shadow: 4px 4px 0 var(--edge); background: var(--edge); }
+#sea { display: block; width: 100%; height: auto; aspect-ratio: 320 / 200; image-rendering: pixelated; image-rendering: crisp-edges; }
+.hud { position: absolute; left: 8px; top: 8px; right: 8px; display: flex; justify-content: space-between; gap: 8px; font-family: var(--pixel); font-size: 10px; pointer-events: none; }
+.hud span { background: rgba(5, 9, 18, .72); padding: 6px 8px; }
+.toast { position: absolute; left: 50%; top: 42%; transform: translate(-50%, -50%); font-family: var(--pixel); font-size: 16px; text-shadow: 3px 3px 0 var(--edge); pointer-events: none; white-space: nowrap; opacity: 0; }
+.toast.show { animation: toast 1.6s steps(8) forwards; }
+@keyframes toast { 0% { opacity: 0; transform: translate(-50%, -20%); } 15% { opacity: 1; transform: translate(-50%, -50%); } 75% { opacity: 1; } 100% { opacity: 0; transform: translate(-50%, -110%); } }
+
+h2 { font-family: var(--body); font-weight: 700; font-size: 1.6rem; line-height: 1.15; margin: 0; text-wrap: balance; }
+.label { font-family: var(--pixel); font-size: 10px; color: var(--muted); letter-spacing: 1px; text-transform: uppercase; }
+p { margin: 0; }
+.muted { color: var(--muted); }
+
+.btn {
+  font-family: var(--pixel); font-size: 11px; line-height: 1.3; letter-spacing: .5px;
+  padding: 13px 14px; cursor: pointer; color: var(--edge);
+  background: var(--accent); border: 4px solid var(--edge);
+  box-shadow: inset -4px -4px 0 var(--accent-d), inset 4px 4px 0 #ffd889;
+}
+.btn.alt { background: var(--panel-2); color: var(--cream); box-shadow: inset -4px -4px 0 var(--shade), inset 4px 4px 0 var(--hi); }
+.btn:active { transform: translateY(2px); }
+.btn:disabled { opacity: .45; cursor: default; }
+.btn:focus-visible, input:focus-visible, .sugg li:focus-visible { outline: 3px solid var(--t2); outline-offset: 2px; }
+.row { display: flex; gap: 10px; flex-wrap: wrap; }
+
+.pips { display: flex; gap: 6px; }
+.pips i { flex: 1; height: 10px; background: var(--shade); border: 2px solid var(--edge); }
+.pips i.done { background: var(--muted); }
+.pips i.now { background: var(--accent); }
+
+.cast { position: relative; display: flex; gap: 10px; flex-wrap: wrap; }
+.field { position: relative; flex: 1 1 240px; min-width: 0; }
+.field input {
+  width: 100%; font: 400 1.2rem var(--body); padding: 12px 14px; color: var(--cream);
+  background: var(--edge); border: 4px solid var(--edge); box-shadow: inset 4px 4px 0 #000, inset -2px -2px 0 var(--hi);
+}
+.field.shake { animation: shake .3s steps(6); }
+@keyframes shake { 25% { transform: translateX(-6px); } 50% { transform: translateX(6px); } 75% { transform: translateX(-3px); } }
+.qhead { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+.clock { font-family: var(--pixel); font-size: 16px; color: var(--cream); font-variant-numeric: tabular-nums; }
+.clock.low { color: var(--bad); animation: blink 1s steps(2) infinite; }
+@keyframes blink { 50% { opacity: .4; } }
+.timebar { height: 12px; background: var(--edge); border: 2px solid var(--edge); }
+.timebar i { display: block; height: 100%; width: 100%; background: var(--accent); transition: width .2s linear; }
+.timebar i.low { background: var(--bad); }
+.feedback { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; min-height: 1.5em; }
+.feedback .nope { color: var(--bad); }
+.feedback .btn { font-size: 10px; padding: 9px 10px; }
+
+.result { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.answer { font-family: var(--pixel); font-size: 13px; padding: 10px 12px; background: var(--edge); }
+.tierbadge { font-family: var(--pixel); font-size: 11px; padding: 8px 10px; color: var(--edge); }
+
+.tiers { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+@media (max-width: 520px) { .tiers { grid-template-columns: repeat(2, 1fr); } }
+.tier { background: var(--edge); padding: 10px; display: flex; flex-direction: column; gap: 4px; }
+.tier b { font-family: var(--pixel); font-size: 14px; }
+.tier small { font-family: var(--pixel); font-size: 8px; color: var(--muted); letter-spacing: .5px; }
+.rules { margin: 0; padding-left: 1.1em; display: flex; flex-direction: column; gap: 4px; }
+
+.catch { display: grid; grid-template-columns: 140px 1fr; gap: 16px; align-items: center; }
+@media (max-width: 480px) { .catch { grid-template-columns: 1fr; } }
+.catch canvas { width: 140px; height: auto; image-rendering: pixelated; background: var(--edge); }
+.catch h2 { font-size: 1.8rem; }
+.rar { font-family: var(--pixel); font-size: 10px; padding: 6px 8px; color: var(--edge); display: inline-block; }
+.new { font-family: var(--pixel); font-size: 9px; color: var(--worm); margin-left: 8px; }
+
+.recap { display: flex; flex-direction: column; }
+.recap div { display: flex; justify-content: space-between; gap: 12px; padding-block: 7px; border-bottom: 2px dashed var(--hi); }
+.recap span { min-width: 0; }
+.recap b { font-family: var(--pixel); font-size: 11px; white-space: nowrap; }
+
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; }
+.fishcard { background: var(--edge); padding: 10px; display: flex; flex-direction: column; gap: 6px; align-items: flex-start; border: 2px solid transparent; }
+.fishcard.on { border-color: var(--accent); }
+.fishcard canvas { width: 100%; height: auto; image-rendering: pixelated; }
+.fishcard .nm { font-weight: 700; line-height: 1.1; }
+.fishcard .btn { font-size: 9px; padding: 8px 9px; }
+.odds { width: 100%; border-collapse: collapse; font-size: .95rem; }
+.odds th, .odds td { text-align: left; padding: 6px 8px; border-bottom: 2px solid var(--shade); vertical-align: top; }
+.odds th { font-family: var(--pixel); font-size: 9px; color: var(--muted); font-weight: 400; }
+.tablewrap { overflow-x: auto; }
+.note { font-size: .95rem; color: var(--muted); }
+@media (prefers-reduced-motion: reduce) { .toast.show { animation: none; opacity: 1; } }
+</style>
+
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <h1 class="logo">RARE<span>CATCH</span></h1>
+    <div class="topright">
+      <span class="stat" id="best"></span>
+      <button class="btn alt" id="tackle" type="button">TACKLE BOX</button>
+    </div>
+  </header>
+  <div class="stage">
+    <canvas id="sea" width="320" height="200" aria-label="Pixel lake with your fishing line"></canvas>
+    <div class="hud"><span id="hudL">DEPTH 0 FT</span><span id="hudR"></span></div>
+    <div class="toast" id="toast"></div>
+  </div>
+  <section class="box" id="panel"></section>
+</div>
+
+<script>
+// ===================== PROMPTS =====================
+// "Answer/alias/alias*tier" separated by ";". Tier 1 = most common answer, 6 = the single rarest answer.
+// Rarity tiers are estimates of how often people would give each answer.
+const BANK = [
+ ["Name a planet or dwarf planet in our solar system","Earth*1;Mars*1;Jupiter*2;Saturn*2;Pluto*2;Venus*2;Mercury*3;Neptune*3;Uranus*3;Ceres*4;Eris*4;Haumea*5;Makemake*6"],
+ ["Name a country that borders Germany","France*1;Poland*2;Austria*2;Switzerland*3;Netherlands/Holland*3;Belgium*4;Denmark*4;Czech Republic/Czechia*5;Luxembourg*6"],
+ ["Name a US state that starts with M","Michigan*1;Massachusetts*2;Maine*2;Minnesota*3;Missouri*3;Mississippi*3;Maryland*5;Montana*6"],
+ ["Name a noble gas","Helium*1;Neon*2;Argon*3;Krypton*4;Xenon*4;Radon*5;Oganesson*6"],
+ ["Name a bone in the human body","Skull/Cranium*1;Rib*1;Femur/Thigh bone*2;Mandible/Jaw/Jawbone*2;Humerus*3;Tibia/Shin bone*3;Fibula*3;Pelvis/Hip bone*3;Vertebra/Vertebrae*3;Radius*4;Ulna*4;Clavicle/Collarbone*4;Scapula/Shoulder blade*4;Sternum/Breastbone*4;Patella/Kneecap*4;Coccyx/Tailbone*4;Stapes/Stirrup*5;Metacarpal*5;Metatarsal*5;Phalanx/Phalanges*5;Sacrum*5;Talus*5;Calcaneus/Heel bone*5;Incus/Anvil*5;Malleus/Hammer*5;Hyoid*6"],
+ ["Name a country in South America","Brazil*1;Argentina*2;Colombia*3;Peru*3;Chile*3;Venezuela*4;Ecuador*4;Bolivia*4;Uruguay*5;Paraguay*5;Guyana*5;Suriname*6"],
+ ["Name a flat shape with only straight sides","Square*1;Triangle*1;Rectangle*2;Pentagon*2;Hexagon*3;Octagon*3;Trapezoid/Trapezium*4;Rhombus*4;Parallelogram*4;Kite*5;Heptagon*5;Decagon*5;Nonagon*5;Dodecagon*6"],
+ ["Name a mammal that lives in the ocean","Whale*1;Dolphin*1;Seal*2;Sea lion*3;Orca/Killer whale*3;Walrus*4;Manatee/Sea cow*4;Sea otter/Otter*4;Narwhal*4;Porpoise*5;Beluga*5;Polar bear*5;Dugong*6"],
+ ["Name a US president from before 1900","George Washington/Washington*1;Abraham Lincoln/Lincoln*1;Thomas Jefferson/Jefferson*2;John Adams*3;James Madison/Madison*4;Andrew Jackson/Jackson*4;James Monroe/Monroe*4;Ulysses S Grant/Ulysses Grant/Grant*4;John Quincy Adams*5;Martin Van Buren/Van Buren*5;James K Polk/James Polk/Polk*5;Andrew Johnson*5;James Garfield/Garfield*5;Grover Cleveland/Cleveland*5;William McKinley/McKinley*5;William Henry Harrison*5;John Tyler/Tyler*5;Zachary Taylor/Taylor*5;Millard Fillmore/Fillmore*5;Franklin Pierce/Pierce*5;James Buchanan/Buchanan*5;Rutherford B Hayes/Rutherford Hayes/Hayes*5;Benjamin Harrison*5;Chester Arthur/Chester A Arthur*6"],
+ ["Name an element whose symbol is a single letter","Hydrogen/H*1;Oxygen/O*1;Carbon/C*2;Nitrogen/N*3;Sulfur/Sulphur/S*3;Potassium/K*4;Iodine/I*4;Fluorine/F*4;Phosphorus/P*4;Uranium/U*4;Boron/B*5;Tungsten/W*5;Vanadium/V*5;Yttrium/Y*6"],
+ ["Name a play by Shakespeare","Romeo and Juliet*1;Hamlet*1;Macbeth*2;Othello*3;King Lear*3;A Midsummer Night's Dream/Midsummer Night's Dream*3;Julius Caesar*3;The Tempest*4;Twelfth Night*4;Much Ado About Nothing*4;The Merchant of Venice*4;The Taming of the Shrew*4;Richard III/Richard the Third*5;As You Like It*5;Henry V/Henry the Fifth*5;Antony and Cleopatra*5;Coriolanus*5;Titus Andronicus*5;The Winter's Tale*5;Measure for Measure*5;King John*5;Pericles*5;Cymbeline*6"],
+ ["Name a dog breed","Labrador/Labrador Retriever/Lab*1;Golden Retriever*1;German Shepherd*2;Poodle*2;Bulldog*2;Beagle*3;Chihuahua*3;Pug*3;Husky/Siberian Husky*3;Dachshund/Wiener dog/Sausage dog*3;Rottweiler*4;Boxer*4;Dalmatian*4;Corgi*4;Great Dane*4;Doberman*4;Shih Tzu*5;Border Collie*5;Pomeranian*5;Greyhound*5;Shiba Inu*5;Saint Bernard/St Bernard*5;Vizsla*5;Akita*5;Whippet*5;Samoyed*5;Bernese Mountain Dog*5;Newfoundland*5;Weimaraner*5;Bichon Frise*5;Basenji*6"],
+ ["Name a country in Africa","Egypt*1;Nigeria*2;South Africa*2;Kenya*2;Ethiopia*3;Morocco*3;Ghana*3;Madagascar*3;Somalia*4;Sudan*4;Algeria*4;Tanzania*4;Uganda*4;Libya*4;Tunisia*4;Zimbabwe*4;Rwanda*4;Congo/DR Congo/Democratic Republic of the Congo/Republic of the Congo*4;Cameroon*5;Senegal*5;Angola*5;Mali*5;Niger*5;Chad*5;Botswana*5;Namibia*5;Zambia*5;Mozambique*5;Sierra Leone*5;Liberia*5;South Sudan*5;Ivory Coast/Cote d'Ivoire*5;Malawi*5;Eritrea*5;Djibouti*5;Gabon*5;Benin*5;Togo*5;Burkina Faso*5;Lesotho*5;Eswatini/Swaziland*5;Guinea*5;Gambia*5;Mauritania*5;Mauritius*5;Seychelles*5;Comoros*5;Cape Verde/Cabo Verde*5;Burundi*5;Central African Republic*5;Equatorial Guinea*5;Guinea-Bissau*5;Sao Tome and Principe*6"],
+ ["Name a part of a cell","Nucleus*1;Mitochondria/Mitochondrion*1;Cell membrane/Membrane/Plasma membrane*2;Cytoplasm*3;Ribosome*3;Cell wall*3;Chloroplast*3;Vacuole*4;Endoplasmic reticulum/ER*4;Golgi apparatus/Golgi body/Golgi*4;Lysosome*5;Nucleolus*5;Cytoskeleton*5;Vesicle*5;Centriole*6"],
+ ["Name an instrument you'd find in an orchestra","Violin*1;Flute*2;Trumpet*2;Cello*2;Viola*3;Clarinet*3;Trombone*3;Tuba*3;Harp*3;Piano*3;Cymbals*4;Double bass/Bass/Contrabass*4;Oboe*4;French horn/Horn*4;Snare drum*4;Bassoon*5;Piccolo*5;Triangle*5;Xylophone*5;Timpani/Kettle drum*5;Bass drum*5;Glockenspiel*5;English horn/Cor anglais*5;Contrabassoon*5;Marimba*5;Tubular bells/Chimes*5;Celesta*6"],
+ ["Name a Greek god or goddess","Zeus*1;Poseidon*2;Hades*2;Athena*2;Aphrodite*3;Apollo*3;Ares*3;Hermes*3;Hera*3;Artemis*4;Dionysus*4;Persephone*4;Demeter*5;Hephaestus*5;Eros*5;Nike*5;Pan*5;Gaia*5;Kronos/Cronus*5;Hestia*5;Nemesis*5;Hecate*5;Helios*5;Selene*5;Hypnos*5;Eos*5;Iris*5;Thanatos*6"],
+ ["Name the capital city of a European country","Paris*1;London*1;Rome*2;Berlin*2;Madrid*2;Moscow*3;Athens*3;Dublin*3;Amsterdam*3;Vienna*3;Lisbon*4;Brussels*4;Prague*4;Warsaw*4;Stockholm*4;Oslo*4;Copenhagen*4;Kyiv/Kiev*4;Helsinki*5;Budapest*5;Bern*5;Reykjavik*5;Bucharest*5;Sofia*5;Belgrade*5;Zagreb*5;Ljubljana*5;Bratislava*5;Tallinn*5;Riga*5;Vilnius*5;Minsk*5;Chisinau*5;Tirana*5;Skopje*5;Sarajevo*5;Podgorica*5;Valletta*5;Luxembourg*5;Monaco*5;Andorra la Vella*5;San Marino*5;Nicosia*5;Vaduz*6"],
+ ["Name a word for a baby animal","Puppy*1;Kitten*1;Chick*2;Lamb*2;Calf*3;Cub*3;Foal*3;Duckling*3;Piglet*3;Bunny*3;Pup*3;Tadpole*4;Joey*4;Kid*4;Fawn*4;Hatchling*5;Colt*5;Filly*5;Gosling*5;Cygnet*5;Eaglet*5;Owlet*5;Kit*5;Fry*5;Squab*5;Leveret*6"],
+ ["Name a programming language","Python*1;JavaScript*2;Java*2;Scratch*3;C*3;C++*3;C#*4;Ruby*4;Swift*4;PHP*4;Go/Golang*5;Rust*5;TypeScript*5;Lua*5;SQL*5;Kotlin*5;Perl*5;Haskell*5;Fortran*5;R*5;Julia*5;Assembly*5;Lisp*5;MATLAB*5;Dart*5;Pascal*5;COBOL*6"],
+ ["Name a gas found in Earth's atmosphere","Oxygen*1;Carbon dioxide/CO2*2;Nitrogen*3;Water vapor/Water vapour*4;Argon*4;Methane*4;Helium*5;Hydrogen*5;Ozone*5;Neon*5;Krypton*5;Nitrous oxide*5;Xenon*6"],
+ ["Name a famous scientist (last name is fine)","Albert Einstein/Einstein*1;Isaac Newton/Newton*2;Charles Darwin/Darwin*3;Marie Curie/Curie*3;Galileo Galilei/Galileo*3;Nikola Tesla/Tesla*3;Stephen Hawking/Hawking*3;Thomas Edison/Edison*3;Copernicus/Nicolaus Copernicus*4;Archimedes*4;Aristotle*4;Johannes Kepler/Kepler*5;Louis Pasteur/Pasteur*5;Michael Faraday/Faraday*5;Gregor Mendel/Mendel*5;Niels Bohr/Bohr*5;Alan Turing/Turing*5;Edwin Hubble/Hubble*5;Richard Feynman/Feynman*5;Ada Lovelace/Lovelace*5;Rosalind Franklin*5;James Clerk Maxwell/Maxwell*5;Werner Heisenberg/Heisenberg*5;Erwin Schrodinger/Schrodinger*5;Dmitri Mendeleev/Mendeleev*5;Max Planck/Planck*5;Ernest Rutherford/Rutherford*5;John Dalton/Dalton*5;Carl Linnaeus/Linnaeus*5;Antoine Lavoisier/Lavoisier*6"],
+ ["Name a sport played with a ball","Soccer/Football*1;Basketball*1;Baseball*2;Tennis*2;American football*2;Volleyball*3;Golf*3;Rugby*3;Bowling*3;Cricket*4;Table tennis/Ping pong*4;Softball*4;Dodgeball*4;Handball*5;Water polo*5;Lacrosse*5;Squash*5;Kickball*5;Pickleball*5;Billiards/Pool/Snooker*5;Field hockey*5;Racquetball*5;Polo*5;Netball*5;Croquet*5;Bocce*5;Hurling*5;Jai alai*5;Korfball*5;Sepak takraw*6"],
+ ["Name a moon of a planet in our solar system","Luna/The Moon/Moon*2;Titan*3;Europa*3;Io*4;Ganymede*4;Phobos*4;Callisto*5;Enceladus*5;Deimos*5;Triton*5;Charon*5;Miranda*5;Oberon*5;Titania*5;Mimas*5;Rhea*5;Iapetus*5;Dione*5;Tethys*5;Ariel*5;Hyperion*5;Umbriel*6"],
+ ["Name a type of cloud","Cumulus*1;Cirrus*2;Stratus*3;Cumulonimbus*3;Nimbostratus*4;Altostratus*5;Altocumulus*5;Cirrostratus*5;Stratocumulus*5;Mammatus*5;Lenticular*5;Shelf cloud*5;Noctilucent*5;Cirrocumulus*6"],
+ ["Name one of the Seven Wonders of the Ancient World","Great Pyramid of Giza/Pyramid of Giza/Great Pyramid/Pyramids/Pyramids of Giza*1;Hanging Gardens of Babylon/Hanging Gardens*2;Colossus of Rhodes/Colossus*4;Lighthouse of Alexandria/Pharos of Alexandria/Pharos*4;Statue of Zeus at Olympia/Statue of Zeus*5;Temple of Artemis at Ephesus/Temple of Artemis*5;Mausoleum at Halicarnassus/Mausoleum*6"],
+ ["Name an organ in the human body","Heart*1;Brain*1;Lungs/Lung*2;Liver*2;Kidney/Kidneys*2;Stomach*2;Skin*3;Intestine/Intestines/Small intestine/Large intestine*3;Bladder*4;Pancreas*4;Spleen*4;Appendix*4;Gallbladder*5;Esophagus/Oesophagus*5;Colon*5;Uterus*5;Tongue*5;Thyroid*5;Adrenal gland/Adrenal glands*5;Pituitary gland/Pituitary*5;Diaphragm*5;Thymus*6"],
+ ["Name a language with over 50 million speakers","English*1;Spanish*1;Mandarin/Chinese*2;French*2;Hindi*3;Arabic*3;Portuguese*3;Russian*3;Japanese*3;German*3;Korean*4;Italian*4;Bengali/Bangla*5;Urdu*5;Indonesian*5;Punjabi*5;Turkish*5;Vietnamese*5;Cantonese*5;Swahili*5;Marathi*5;Telugu*5;Tamil*5;Javanese*5;Persian/Farsi*5;Gujarati*5;Thai*5;Hausa*6"],
+ ["Name a vegetable that grows underground","Potato*1;Carrot*1;Onion*2;Beet/Beetroot*3;Radish*3;Garlic*3;Sweet potato*3;Turnip*4;Parsnip*4;Ginger*4;Yam*4;Cassava/Yuca*5;Rutabaga/Swede*5;Shallot*5;Jicama*5;Taro*5;Horseradish*5;Jerusalem artichoke/Sunchoke*5;Daikon*5;Celeriac*6"],
+ ["Name an animal that is a reptile","Snake*1;Lizard*1;Turtle*2;Crocodile*2;Alligator*2;Tortoise*3;Gecko*3;Iguana*3;Chameleon*3;Komodo dragon*4;Python*4;Cobra*4;Rattlesnake*4;Anaconda*4;Bearded dragon*5;Monitor lizard*5;Skink*5;Boa*5;Viper*5;Gila monster*5;Caiman*5;Gharial*5;Anole*5;Tuatara*6"],
+ ["Name a color of the rainbow","Red*1;Blue*1;Green*1;Orange*2;Yellow*2;Violet/Purple*4;Indigo*6"],
+ ["Name a fruit that is red on the outside","Strawberry*1;Apple*1;Cherry*1;Raspberry*2;Tomato*3;Pomegranate*3;Cranberry*3;Watermelon*3;Red grape/Grape*4;Lychee*4;Dragon fruit/Pitaya*4;Red currant/Currant*5;Goji berry/Goji*5;Red banana*5;Lingonberry*5;Rambutan*6"],
+ ["Name a breed of cat","Persian*1;Siamese*1;Maine Coon*2;Sphynx*2;Bengal*3;Ragdoll*3;British Shorthair*3;Scottish Fold*4;Russian Blue*4;Abyssinian*4;Birman*5;Burmese*5;Devon Rex*5;Cornish Rex*5;Savannah*5;Norwegian Forest Cat*5;Turkish Van*5;Himalayan*5;Manx*5;Korat*6"],
+ ["Name a type of tree","Oak*1;Pine*1;Maple*1;Palm*2;Birch*2;Willow*2;Redwood*3;Cedar*3;Spruce*3;Fir*3;Sequoia*4;Ash*4;Elm*4;Cypress*4;Magnolia*4;Eucalyptus*4;Sycamore*4;Beech*4;Baobab*5;Hickory*5;Juniper*5;Larch*5;Yew*5;Hawthorn*5;Hemlock*5;Ginkgo*5;Banyan*5;Hornbeam*6"],
+ ["Name a green vegetable","Broccoli*1;Lettuce*1;Spinach*1;Cucumber*2;Peas*2;Green beans*2;Celery*2;Kale*3;Asparagus*3;Zucchini/Courgette*3;Cabbage*3;Brussels sprouts*3;Green pepper*3;Artichoke*4;Okra*4;Bok choy*4;Leek*4;Edamame*4;Arugula/Rocket*5;Collard greens*5;Swiss chard/Chard*5;Watercress*5;Romanesco*5;Kohlrabi*6"],
+ ["Name a country in Asia","China*1;Japan*1;India*1;South Korea/Korea*2;Thailand*2;Vietnam*2;Indonesia*3;Philippines*3;Pakistan*3;Malaysia*3;Singapore*3;Saudi Arabia*3;Iran*3;Iraq*3;Afghanistan*3;Israel*3;North Korea*3;Turkey*3;Nepal*4;Bangladesh*4;Mongolia*4;Sri Lanka*4;Cambodia*4;Myanmar/Burma*4;Kazakhstan*4;Jordan*4;Syria*4;Lebanon*4;Yemen*4;Qatar*4;United Arab Emirates/UAE*4;Taiwan*4;Laos*5;Uzbekistan*5;Turkmenistan*5;Kyrgyzstan*5;Tajikistan*5;Bhutan*5;Brunei*5;Maldives*5;Oman*5;Kuwait*5;Bahrain*5;Armenia*5;Azerbaijan*5;Georgia*5;Timor-Leste/East Timor*6"],
+ ["Name a country in Europe","France*1;Germany*1;Italy*1;Spain*1;England*1;United Kingdom/UK/Britain/Great Britain*2;Portugal*2;Greece*2;Netherlands/Holland*2;Ireland*2;Russia*2;Scotland*2;Poland*3;Sweden*3;Norway*3;Switzerland*3;Belgium*3;Austria*3;Denmark*3;Ukraine*3;Wales*3;Finland*4;Iceland*4;Czechia/Czech Republic*4;Hungary*4;Romania*4;Croatia*4;Serbia*4;Bulgaria*4;Slovakia*5;Slovenia*5;Estonia*5;Latvia*5;Lithuania*5;Belarus*5;Moldova*5;Albania*5;North Macedonia/Macedonia*5;Bosnia and Herzegovina/Bosnia*5;Montenegro*5;Malta*5;Luxembourg*5;Monaco*5;Andorra*5;San Marino*5;Vatican City/Vatican*5;Cyprus*5;Liechtenstein*6"],
+ ["Name a US state capital","Austin*2;Boston*2;Atlanta*2;Denver*2;Phoenix*2;Sacramento*3;Honolulu*3;Nashville*3;Columbus*3;Indianapolis*3;Salt Lake City*3;Oklahoma City*3;Albany*4;Tallahassee*4;Richmond*4;Raleigh*4;Springfield*4;Boise*4;Des Moines*4;Madison*4;Saint Paul/St Paul*4;Little Rock*4;Baton Rouge*4;Montgomery*4;Providence*4;Juneau*4;Santa Fe*4;Lansing*5;Harrisburg*5;Olympia*5;Salem*5;Carson City*5;Helena*5;Bismarck*5;Pierre*5;Cheyenne*5;Topeka*5;Lincoln*5;Jefferson City*5;Jackson*5;Frankfort*5;Charleston*5;Columbia*5;Annapolis*5;Dover*5;Trenton*5;Hartford*5;Concord*5;Augusta*5;Montpelier*6"],
+ ["Name a breakfast food","Pancakes*1;Eggs*1;Cereal*1;Waffles*1;Bacon*1;Toast*2;Oatmeal*2;French toast*2;Sausage*2;Bagel*3;Muffin*3;Yogurt*3;Hash browns*3;Croissant*3;Omelette/Omelet*3;Grits*4;Granola*4;Breakfast burrito*4;Crepes*4;Porridge*4;Smoothie*4;Biscuits and gravy*4;Eggs Benedict*5;Shakshuka*5;Congee*5;Huevos rancheros*5;Quiche*5;Kedgeree*6"],
+ ["Name a pizza topping","Pepperoni*1;Cheese*1;Sausage*2;Mushrooms*2;Pineapple*2;Onions*3;Olives*3;Peppers/Green peppers/Bell peppers*3;Ham*3;Bacon*3;Chicken*4;Spinach*4;Jalapenos*4;Tomatoes*4;Basil*4;Anchovies*5;Artichoke*5;Garlic*5;Feta*5;Prosciutto*5;Arugula*5;Capers*6"],
+ ["Name an animal native to Australia","Kangaroo*1;Koala*1;Emu*2;Platypus*2;Wombat*3;Dingo*3;Tasmanian devil*3;Saltwater crocodile/Crocodile*3;Kookaburra*4;Echidna*4;Wallaby*4;Cassowary*5;Quokka*5;Bilby*5;Thorny devil*5;Frilled lizard*5;Sugar glider*5;Taipan*5;Numbat*6"],
+ ["Name a mythical creature","Dragon*1;Unicorn*1;Mermaid*2;Phoenix*2;Griffin/Gryphon*3;Centaur*3;Pegasus*3;Minotaur*3;Yeti*3;Bigfoot/Sasquatch*3;Vampire*3;Werewolf*3;Fairy*3;Kraken*4;Medusa/Gorgon*4;Cyclops*4;Sphinx*4;Hydra*4;Leprechaun*4;Goblin*4;Troll*4;Basilisk*5;Chimera*5;Banshee*5;Kitsune*5;Wendigo*5;Manticore*5;Kelpie*5;Chupacabra*5;Selkie*6"],
+ ["Name a part of a plant or flower","Petal*1;Stem*1;Leaf*1;Root*1;Seed*2;Pollen*2;Bud*2;Thorn*3;Stamen*3;Pistil*3;Sepal*4;Ovary*4;Anther*4;Stigma*4;Style*5;Filament*5;Receptacle*5;Pedicel*6"],
+ ["Name a famous painter","Leonardo da Vinci/Da Vinci/Leonardo*1;Pablo Picasso/Picasso*1;Vincent van Gogh/Van Gogh*1;Michelangelo*2;Claude Monet/Monet*2;Rembrandt*3;Frida Kahlo/Kahlo*3;Andy Warhol/Warhol*3;Salvador Dali/Dali*3;Bob Ross*3;Raphael*4;Henri Matisse/Matisse*4;Georgia O'Keeffe/O'Keeffe*4;Pierre-Auguste Renoir/Renoir*4;Jackson Pollock/Pollock*4;Paul Cezanne/Cezanne*5;Gustav Klimt/Klimt*5;Johannes Vermeer/Vermeer*5;Sandro Botticelli/Botticelli*5;Caravaggio*5;Edvard Munch/Munch*5;Hokusai*5;J M W Turner/Turner*5;Francisco Goya/Goya*5;Edgar Degas/Degas*5;Georges Seurat/Seurat*5;Rene Magritte/Magritte*5;Wassily Kandinsky/Kandinsky*5;El Greco*5;Titian*6"],
+ ["Name a constellation","Orion*1;Ursa Major/Great Bear/Big Dipper*1;Ursa Minor/Little Bear/Little Dipper*2;Cassiopeia*3;Scorpius/Scorpio*3;Leo*3;Taurus*3;Gemini*3;Draco*4;Pegasus*4;Andromeda*4;Sagittarius*4;Capricornus/Capricorn*4;Aquarius*4;Pisces*4;Aries*4;Virgo*4;Libra*4;Cancer*4;Cygnus*5;Lyra*5;Aquila*5;Perseus*5;Hercules*5;Centaurus*5;Crux/Southern Cross*5;Canis Major*5;Bootes*5;Monoceros*6"],
+ ["Name a famous composer","Wolfgang Amadeus Mozart/Mozart*1;Ludwig van Beethoven/Beethoven*1;Johann Sebastian Bach/Bach*2;Frederic Chopin/Chopin*3;Pyotr Tchaikovsky/Tchaikovsky*3;Antonio Vivaldi/Vivaldi*3;John Williams*3;Hans Zimmer*3;George Frideric Handel/Handel*4;Joseph Haydn/Haydn*4;Franz Schubert/Schubert*4;Johannes Brahms/Brahms*4;Claude Debussy/Debussy*4;Richard Wagner/Wagner*4;Giuseppe Verdi/Verdi*5;Igor Stravinsky/Stravinsky*5;Franz Liszt/Liszt*5;Sergei Rachmaninoff/Rachmaninoff*5;Gustav Mahler/Mahler*5;George Gershwin/Gershwin*5;Antonin Dvorak/Dvorak*5;Giacomo Puccini/Puccini*5;Edvard Grieg/Grieg*5;Maurice Ravel/Ravel*5;Erik Satie/Satie*5;Gustav Holst/Holst*5;Sergei Prokofiev/Prokofiev*5;Dmitri Shostakovich/Shostakovich*5;Jean Sibelius/Sibelius*5;Felix Mendelssohn/Mendelssohn*5;Hildegard von Bingen/Hildegard*6"],
+ ["Name a famous explorer","Christopher Columbus/Columbus*1;Ferdinand Magellan/Magellan*2;Marco Polo*2;Neil Armstrong/Armstrong*3;Lewis and Clark/Meriwether Lewis/William Clark*3;Vasco da Gama*3;Sacagawea*3;Amerigo Vespucci/Vespucci*4;James Cook/Captain Cook*4;Leif Erikson/Leif Ericson*4;Ernest Shackleton/Shackleton*4;Roald Amundsen/Amundsen*4;Hernan Cortes/Cortes*4;Henry Hudson/Hudson*4;Ponce de Leon*4;Edmund Hillary/Hillary*4;Francis Drake*4;Jacques Cousteau/Cousteau*4;Yuri Gagarin/Gagarin*4;Francisco Pizarro/Pizarro*5;Jacques Cartier/Cartier*5;Ibn Battuta*5;Zheng He*5;Hernando de Soto/De Soto*5;Robert Peary/Peary*5;Abel Tasman/Tasman*5;Walter Raleigh*5;Matthew Henson*6"],
+ ["Name a type of pasta","Spaghetti*1;Penne*1;Macaroni*1;Lasagna/Lasagne*2;Fettuccine*2;Ravioli*2;Rigatoni*3;Linguine*3;Fusilli*3;Farfalle/Bow tie*3;Tortellini*3;Rotini*3;Ziti*4;Gnocchi*4;Orzo*4;Angel hair/Capellini*4;Tagliatelle*4;Vermicelli*4;Pappardelle*5;Orecchiette*5;Conchiglie/Shells*5;Cannelloni*5;Manicotti*5;Bucatini*5;Ditalini*5;Gemelli*5;Cavatappi*5;Radiatori*5;Strozzapreti*6"],
+ ["Name an ingredient used to bake a cake","Flour*1;Sugar*1;Eggs*1;Butter*1;Milk*2;Baking powder*2;Vanilla*3;Baking soda*3;Salt*3;Oil*3;Chocolate*3;Cocoa*4;Buttermilk*5;Cream cheese*5;Sour cream*5;Cornstarch*5;Honey*5;Lemon zest*5;Cream of tartar*6"],
+ ["Name a currency","Dollar*1;Euro*1;Pound*1;Yen*2;Peso*2;Rupee*3;Yuan/Renminbi*3;Franc*3;Ruble/Rouble*4;Won*4;Real*4;Rand*4;Krona*4;Lira*4;Krone*5;Dinar*5;Dirham*5;Baht*5;Shekel*5;Zloty*5;Rupiah*5;Ringgit*5;Forint*5;Dong*5;Naira*5;Riyal*5;Rial*5;Kwanza*5;Lev*5;Leu*5;Taka*5;Cedi*5;Kwacha*6"],
+ ["Name a type of weather","Rain*1;Snow*1;Tornado*1;Hurricane*1;Thunderstorm*2;Hail*2;Lightning*2;Fog*3;Blizzard*3;Sleet*3;Drought*3;Flood*3;Monsoon*4;Typhoon*4;Heat wave*4;Cyclone*4;Dust storm*4;Sandstorm*4;Ice storm*4;Frost*4;Mist*4;Freezing rain*5;Waterspout*5;Haboob*5;Polar vortex*5;Microburst*5;Dew*5;Derecho*6"],
+ ["Name a dinosaur","Tyrannosaurus rex/T rex/Tyrannosaurus*1;Triceratops*1;Velociraptor/Raptor*2;Stegosaurus*2;Brachiosaurus*3;Spinosaurus*3;Diplodocus*3;Ankylosaurus*3;Brontosaurus*3;Allosaurus*4;Parasaurolophus*4;Iguanodon*4;Apatosaurus*4;Dilophosaurus*4;Pachycephalosaurus*5;Carnotaurus*5;Giganotosaurus*5;Gallimimus*5;Compsognathus*5;Deinonychus*5;Therizinosaurus*5;Argentinosaurus*5;Baryonyx*5;Utahraptor*5;Microraptor*5;Oviraptor*5;Edmontosaurus*5;Maiasaura*5;Psittacosaurus*5;Amargasaurus*6"],
+ ["Name a bird that can't fly","Penguin*1;Ostrich*1;Emu*2;Kiwi*2;Dodo*3;Cassowary*4;Rhea*5;Kakapo*5;Moa*5;Flightless cormorant*5;Weka*5;Takahe*6"],
+ ["Name an insect","Ant*1;Bee*1;Butterfly*1;Fly*1;Mosquito*2;Ladybug/Ladybird*2;Beetle*2;Grasshopper*2;Dragonfly*3;Cockroach*3;Moth*3;Wasp*3;Cricket*3;Termite*4;Firefly*4;Praying mantis/Mantis*4;Flea*4;Hornet*4;Stick insect*4;Cicada*4;Locust*4;Earwig*5;Aphid*5;Weevil*5;Silverfish*5;Lacewing*5;Mayfly*5;Katydid*5;Louse/Lice*5;Damselfly*5;Scarab*5;Water strider*6"],
+ ["Name a river","Nile*1;Amazon*1;Mississippi*1;Thames*2;Missouri*3;Colorado*3;Rio Grande*3;Yangtze*3;Danube*3;Ganges*3;Hudson*3;Seine*4;Rhine*4;Volga*4;Ohio*4;Mekong*4;Congo*4;Tigris*4;Euphrates*4;Jordan*4;Yellow River/Huang He*4;Columbia*5;Zambezi*5;Niger*5;Indus*5;Tiber*5;Loire*5;Elbe*5;Orinoco*5;Yukon*5;Murray*5;Snake*5;Potomac*5;Delaware*5;Tennessee*5;Lena*5;Yenisei*5;Ob*6"],
+ ["Name a Roman god or goddess","Jupiter*1;Mars*1;Venus*1;Neptune*2;Mercury*2;Pluto*2;Cupid*2;Juno*3;Minerva*3;Apollo*3;Diana*3;Vulcan*3;Saturn*3;Bacchus*4;Ceres*4;Vesta*4;Janus*4;Aurora*5;Faunus*5;Fortuna*5;Bellona*5;Somnus*5;Proserpina*5;Luna*5;Sol*5;Terminus*6"],
+ ["Name a Norse god or goddess","Thor*1;Odin*1;Loki*1;Freya/Freyja*2;Frigg/Frigga*3;Baldur/Balder*3;Heimdall*3;Hel*3;Tyr*4;Freyr/Frey*4;Sif*4;Njord*5;Bragi*5;Idun/Idunn*5;Vidar*5;Vali*5;Ullr*5;Hodr*5;Skadi*5;Forseti*6"],
+ ["Name a famous landmark","Eiffel Tower*1;Statue of Liberty*1;Great Wall of China/Great Wall*1;Taj Mahal*2;Colosseum*2;Big Ben*2;Leaning Tower of Pisa*2;Pyramids of Giza/Pyramids*2;Burj Khalifa*3;Empire State Building*3;Golden Gate Bridge*3;Sydney Opera House*3;Machu Picchu*3;Mount Rushmore*3;Christ the Redeemer*3;Stonehenge*3;Louvre*3;Tower Bridge*3;Petra*4;Parthenon*4;Angkor Wat*4;Sagrada Familia*4;Chichen Itza*4;Kremlin*4;Forbidden City*4;Space Needle*4;Arc de Triomphe*4;Gateway Arch*4;Neuschwanstein Castle/Neuschwanstein*5;Alhambra*5;Brandenburg Gate*5;Hagia Sophia*5;Mont Saint-Michel*5;Moai/Easter Island statues*5;Potala Palace*5;Borobudur*6"],
+ ["Name an Olympic sport","Swimming*1;Track and field/Athletics/Running*1;Gymnastics*1;Basketball*2;Soccer/Football*2;Diving*2;Boxing*2;Volleyball*2;Tennis*2;Figure skating*2;Ice hockey/Hockey*2;Skiing*2;Wrestling*3;Fencing*3;Archery*3;Rowing*3;Cycling*3;Weightlifting*3;Skateboarding*3;Table tennis*3;Golf*3;Speed skating*3;Snowboarding*3;Judo*4;Taekwondo*4;Surfing*4;Sailing*4;Canoeing/Kayaking*4;Equestrian*4;Shooting*4;Triathlon*4;Handball*4;Field hockey*4;Water polo*4;Badminton*4;Rugby*4;Sport climbing/Climbing*4;Breaking/Breakdancing*4;Curling*4;Bobsled/Bobsleigh*4;Ski jumping*4;Modern pentathlon/Pentathlon*5;Artistic swimming/Synchronized swimming*5;Trampoline*5;Luge*5;Skeleton*5;Biathlon*5;Nordic combined*6"],
+ ["Name an invention from before 1900","Wheel*1;Telephone*1;Light bulb/Lightbulb*1;Printing press*2;Steam engine*2;Telegraph*3;Compass*3;Gunpowder*3;Camera*3;Paper*3;Bicycle*3;Telescope*3;Microscope*3;Phonograph*4;Sewing machine*4;Cotton gin*4;Typewriter*4;Automobile/Car*4;Thermometer*4;Battery*4;Vaccine*4;Dynamite*4;Steamboat*4;Locomotive/Train*4;Plow/Plough*4;Morse code*4;Barometer*5;Stethoscope*5;Elevator*5;Revolver*5;Abacus*5;Mechanical clock*5;Spinning jenny*5;Lightning rod*5;Bifocals*5;Astrolabe*6"],
+ ["Name a gemstone or mineral","Diamond*1;Ruby*1;Emerald*1;Sapphire*2;Amethyst*2;Quartz*2;Opal*3;Topaz*3;Jade*3;Garnet*3;Turquoise*3;Onyx*4;Jasper*4;Agate*4;Aquamarine*4;Peridot*4;Moonstone*4;Citrine*4;Lapis lazuli*4;Pyrite/Fool's gold*4;Tourmaline*5;Malachite*5;Feldspar*5;Mica*5;Calcite*5;Talc*5;Gypsum*5;Fluorite*5;Tanzanite*5;Alexandrite*5;Zircon*5;Beryl*5;Hematite*5;Magnetite*5;Spinel*5;Benitoite*6"],
+ ["Name a music genre","Pop*1;Rock*1;Hip hop/Rap*1;Country*2;Jazz*2;Classical*2;R&B/Rhythm and blues*3;EDM/Electronic*3;Metal/Heavy metal*3;Blues*3;Reggae*3;Punk*3;K-pop*3;Folk*4;Disco*4;Funk*4;Soul*4;Gospel*4;Indie*4;Techno*4;Dubstep*4;Reggaeton*4;Opera*4;Trap*4;Grunge*5;House*5;Salsa*5;Ska*5;Bluegrass*5;Lo-fi*5;Synthwave*5;Emo*5;Swing*5;Afrobeats*5;Polka*5;Bossa nova*5;Flamenco*5;Zydeco*6"],
+ ["Name a kitchen utensil","Spoon*1;Fork*1;Knife*1;Spatula*1;Whisk*2;Ladle*2;Tongs*2;Peeler*3;Grater*3;Rolling pin*3;Can opener*3;Colander/Strainer*3;Measuring cup*3;Cutting board*3;Pizza cutter*4;Garlic press*4;Potato masher/Masher*4;Sieve*4;Funnel*4;Scale*4;Corkscrew*4;Zester/Microplane*5;Mortar and pestle*5;Baster*5;Skewer*5;Melon baller*5;Mandoline*6"],
+ ["Name a farm animal","Cow*1;Pig*1;Chicken*1;Horse*1;Sheep*1;Goat*2;Duck*2;Turkey*3;Donkey*3;Rooster*3;Bull*3;Llama*4;Alpaca*4;Rabbit*4;Goose*4;Ox*4;Mule*4;Buffalo*5;Yak*5;Emu*5;Ostrich*5;Guinea fowl*5;Quail*5;Bees*5;Pheasant*5;Peacock*5;Camel*5;Water buffalo*5;Zebu*6"],
+ ["Name a subject taught in school","Math*1;English*1;Science*1;History*1;Art*2;PE/Physical education/Gym*2;Music*2;Geography*3;Spanish*3;French*3;Biology*3;Chemistry*3;Physics*3;Computer science*3;Social studies*3;Health*4;Drama/Theater*4;Economics*4;Algebra*4;Geometry*4;Calculus*4;Psychology*4;Government*4;Civics*5;Philosophy*5;Latin*5;Statistics*5;Engineering*5;Home economics*5;Woodshop/Shop*5;Sociology*5;Astronomy*5;Debate*5;Journalism*5;Anatomy*5;Robotics*5;Trigonometry*5;Botany*5;Geology*5;Logic*6"],
+ ["Name an emotion","Happiness/Happy*1;Sadness/Sad*1;Anger/Angry*1;Fear/Scared/Afraid*2;Excitement/Excited*2;Love*2;Joy*2;Surprise/Surprised*3;Disgust*3;Jealousy/Jealous*3;Anxiety/Anxious*3;Embarrassment/Embarrassed*3;Nervous*3;Boredom/Bored*3;Confusion/Confused*3;Frustration/Frustrated*3;Loneliness/Lonely*4;Pride/Proud*4;Guilt/Guilty*4;Shame*4;Hope*4;Gratitude/Grateful*4;Calm*4;Envy*4;Regret*4;Relief*4;Contentment/Content*5;Nostalgia*5;Awe*5;Euphoria*5;Melancholy*5;Contempt*5;Empathy*5;Elation*5;Apathy*5;Schadenfreude*6"],
+ ["Name a tech company","Apple*1;Microsoft*1;Google*1;Samsung*1;Dell*2;HP/Hewlett-Packard*2;Lenovo*2;Amazon*2;Sony*3;Intel*3;Asus*3;Acer*3;IBM*3;Meta/Facebook*3;Nvidia*3;Nintendo*3;Netflix*3;Tesla*3;LG*4;Toshiba*4;AMD*4;Razer*4;Huawei*4;Xiaomi*4;Logitech*4;Panasonic*4;Adobe*4;Nokia*4;Motorola*4;Cisco*5;Oracle*5;Fujitsu*5;Commodore*5;Atari*5;Compaq*5;Philips*5;Sharp*5;Xerox*5;Texas Instruments*5;Hitachi*5;Olivetti*6"],
+ ["Name a 3D shape","Cube*1;Sphere*1;Pyramid*1;Cylinder*2;Cone*2;Prism*3;Rectangular prism*3;Cuboid*4;Triangular prism*4;Tetrahedron*4;Hemisphere*4;Torus*5;Octahedron*5;Dodecahedron*5;Icosahedron*5;Ellipsoid*5;Hexagonal prism*5;Frustum*6"],
+ ["Name a capital city outside Europe","Tokyo*1;Washington DC/Washington*1;Beijing*1;Ottawa*2;Mexico City*2;New Delhi*2;Cairo*2;Seoul*2;Canberra*3;Bangkok*3;Buenos Aires*3;Brasilia*3;Lima*3;Nairobi*3;Manila*3;Jakarta*3;Baghdad*3;Havana*3;Tehran*4;Kabul*4;Islamabad*4;Riyadh*4;Hanoi*4;Santiago*4;Bogota*4;Caracas*4;Wellington*4;Kingston*4;Abu Dhabi*4;Kathmandu*4;Ankara*4;Jerusalem*4;Taipei*4;Singapore*4;Kuala Lumpur*4;Doha*5;Dhaka*5;Ulaanbaatar*5;Addis Ababa*5;Accra*5;Abuja*5;Pretoria*5;Kampala*5;Kigali*5;Dakar*5;Rabat*5;Tunis*5;Algiers*5;Montevideo*5;Asuncion*5;La Paz*5;Quito*5;Amman*5;Beirut*5;Damascus*5;Muscat*5;Thimphu*5;Naypyidaw*5;Phnom Penh*5;Vientiane*5;Tashkent*5;Astana*5;Bishkek*5;Dushanbe*5;Ashgabat*5;Port Moresby*5;Suva*5;Ouagadougou*6"],
+ ["Name a famous ship","Titanic*1;Mayflower*2;Santa Maria*3;Lusitania*4;Queen Mary*4;Bismarck*4;USS Constitution/Old Ironsides*4;USS Arizona*4;HMS Beagle/Beagle*4;Nina*4;Pinta*4;HMS Bounty/Bounty*4;Endurance*5;Cutty Sark*5;Mary Rose*5;HMS Victory*5;Golden Hind*5;Endeavour*5;Vasa*5;Andrea Doria*5;Edmund Fitzgerald*5;Yamato*5;Mary Celeste*5;Kon-Tiki*5;Queen Anne's Revenge*5;Calypso*5;USS Monitor*5;Batavia*6"],
+ ["Name an animal that lives in the Arctic","Polar bear*1;Arctic fox*2;Walrus*2;Seal*2;Narwhal*3;Reindeer/Caribou*3;Snowy owl*3;Arctic wolf*3;Beluga*4;Orca*4;Arctic hare*4;Musk ox*4;Lemming*4;Puffin*4;Harp seal*4;Ptarmigan*5;Wolverine*5;Ermine/Stoat*5;Bowhead whale*5;Arctic tern*5;Snow goose*5;Ringed seal*5;Bearded seal*5;Arctic char*5;Greenland shark*5;Moose*5;Ivory gull*6"],
+ ["Name a hobby","Reading*1;Drawing*1;Gaming/Video games*1;Painting*2;Cooking*2;Fishing*2;Gardening*2;Hiking*3;Knitting*3;Photography*3;Dancing*3;Singing*3;Baking*3;Writing*3;Camping*3;Swimming*3;Skateboarding*3;Collecting*4;Chess*4;Crochet*4;Sewing*4;Woodworking*4;Bird watching/Birding*4;Pottery*4;Origami*4;Juggling*4;Rock climbing*4;Kayaking*4;Surfing*4;Coding*4;Calligraphy*5;Embroidery*5;Scrapbooking*5;Geocaching*5;Beekeeping*5;Astronomy*5;Metal detecting*5;Model building*5;Quilting*5;Archery*5;Whittling*5;Bonsai*5;Falconry*6"],
+ ["Name a word that means big","Large*1;Huge*1;Giant*1;Enormous*2;Massive*2;Gigantic*2;Great*3;Immense*3;Colossal*3;Vast*3;Humongous*3;Jumbo*3;Tremendous*4;Mammoth*4;Monumental*4;Titanic*4;Hefty*4;Bulky*4;Mighty*4;Gargantuan*4;Substantial*4;Sizable/Sizeable*4;Mega*4;Monstrous*4;Grand*4;Hulking*5;Whopping*5;Ample*5;Prodigious*5;Mountainous*5;Elephantine*5;Astronomical*5;Considerable*5;Extensive*5;Towering*5;Brobdingnagian*6"],
+ ["Name something you find at the beach","Sand*1;Ocean/Sea/Water*1;Shells/Seashells*1;Waves*2;Umbrella*2;Towel*2;Sunscreen*2;Crab*2;Seagull/Gull*2;Sandcastle*3;Lifeguard*3;Surfboard*3;Beach ball*3;Seaweed*3;Starfish*3;Bucket*3;Shovel*3;Sunglasses*3;Rocks*4;Driftwood*4;Jellyfish*4;Pier*4;Dunes*4;Hermit crab*4;Flip flops*4;Cooler*4;Tide pool*5;Lighthouse*5;Sea glass*5;Kelp*5;Sand dollar*5;Boardwalk*5;Kite*5;Sea turtle*5;Barnacles*5;Sea urchin*5;Sandpiper*6"],
+ ["Name an animal with stripes","Zebra*1;Tiger*1;Bee*2;Skunk*2;Raccoon*3;Chipmunk*3;Clownfish*3;Tabby cat*3;Wasp*3;Okapi*4;Ring-tailed lemur/Lemur*4;Badger*4;Striped hyena/Hyena*4;Coral snake*4;Angelfish*4;Lionfish*4;Bongo*5;Zebrafish*5;Numbat*5;Kudu*5;Thylacine/Tasmanian tiger*5;Garter snake*5;Striped bass*5;Tapir*5;Banded mongoose*5;Moorish idol*6"],
+ ["Name a breed of horse","Arabian*1;Thoroughbred*1;Clydesdale*2;Mustang*2;Shetland pony/Shetland*2;Appaloosa*3;Quarter horse*3;Palomino*3;Paint*4;Pinto*4;Morgan*4;Friesian*4;Andalusian*4;Shire*4;Percheron*5;Lipizzaner*5;Belgian*5;Tennessee Walker*5;Haflinger*5;Icelandic*5;Fjord*5;Akhal-Teke*5;Mongolian*5;Welsh pony*5;Connemara*5;Hanoverian*5;Lusitano*5;Standardbred*5;Falabella*6"],
+ ["Name a famous mountain","Mount Everest/Everest*1;K2*2;Kilimanjaro*2;Mount Fuji/Fuji*2;Matterhorn*3;Mont Blanc*3;Mount St Helens*3;Mount Vesuvius/Vesuvius*3;Mount Olympus/Olympus*3;Denali/Mount McKinley*4;Mount Sinai*4;Mount Rainier/Rainier*4;Mount Whitney*4;Pikes Peak*4;Mount Etna/Etna*4;Mauna Kea*4;Aconcagua*5;Elbrus*5;Kangchenjunga*5;Lhotse*5;Makalu*5;Annapurna*5;Ben Nevis*5;Mount Kenya*5;Table Mountain*5;Mount Kosciuszko*5;Eiger*5;Aoraki/Mount Cook*5;Nanga Parbat*5;Mount Ararat/Ararat*5;Half Dome*5;Vinson Massif/Mount Vinson*6"],
+ ["Name a type of boat","Sailboat*1;Canoe*1;Kayak*1;Yacht*2;Submarine*2;Ferry*2;Cruise ship*2;Speedboat*2;Raft*2;Rowboat*3;Tugboat*3;Catamaran*3;Fishing boat*3;Jet ski*3;Lifeboat*3;Pontoon*4;Gondola*4;Barge*4;Paddleboard*4;Houseboat*4;Galleon*4;Dinghy*4;Hovercraft*4;Aircraft carrier*4;Battleship*4;Steamboat*4;Trawler*5;Schooner*5;Junk*5;Dhow*5;Trireme*5;Longship*5;Frigate*5;Clipper*5;Sampan*5;Destroyer*5;Narrowboat*5;Felucca*5;Outrigger*5;Coracle*6"],
+ ["Name a dessert","Ice cream*1;Cake*1;Cookies*1;Brownies*1;Pie*2;Cupcake*2;Cheesecake*2;Donut/Doughnut*2;Pudding*3;Tiramisu*3;Apple pie*3;Sundae*3;Churros*3;Cobbler*4;Creme brulee*4;Macarons*4;Mousse*4;Cannoli*4;Baklava*4;Eclair*4;Flan*4;Gelato*4;Sorbet*4;Mochi*4;Key lime pie*4;Banana split*4;Parfait*4;Fudge*4;Funnel cake*4;Trifle*5;Pavlova*5;Profiteroles*5;Panna cotta*5;Souffle*5;Strudel*5;Tres leches*5;Gulab jamun*5;Bread pudding*5;Tarte tatin*5;Black forest cake*5;Clafoutis*6"],
+ ["Name a famous author","William Shakespeare/Shakespeare*1;J K Rowling/Rowling*1;Stephen King*2;Mark Twain*2;Charles Dickens/Dickens*2;Jane Austen/Austen*2;Dr Seuss*2;Roald Dahl/Dahl*3;Edgar Allan Poe/Poe*3;Ernest Hemingway/Hemingway*3;J R R Tolkien/Tolkien*3;George Orwell/Orwell*3;Rick Riordan/Riordan*3;C S Lewis*3;F Scott Fitzgerald/Fitzgerald*4;Agatha Christie*4;Leo Tolstoy/Tolstoy*4;Harper Lee*4;John Steinbeck/Steinbeck*4;Mary Shelley*4;Maya Angelou/Angelou*4;Homer*4;Jules Verne/Verne*4;Oscar Wilde*4;Emily Dickinson/Dickinson*4;Suzanne Collins*4;Virginia Woolf/Woolf*5;Toni Morrison*5;Fyodor Dostoevsky/Dostoevsky*5;Victor Hugo*5;Charlotte Bronte*5;Emily Bronte*5;Kurt Vonnegut/Vonnegut*5;Herman Melville/Melville*5;Franz Kafka/Kafka*5;Gabriel Garcia Marquez*5;Haruki Murakami/Murakami*5;Beverly Cleary*5;Judy Blume*5;Chinua Achebe/Achebe*5;Miguel de Cervantes/Cervantes*5;Dante/Dante Alighieri*5;Goethe*5;Murasaki Shikibu*6"],
+ ["Name a US state that borders Canada","Washington*1;Alaska*1;Montana*2;Michigan*2;New York*2;Maine*3;Minnesota*3;North Dakota*3;Idaho*4;Vermont*4;New Hampshire*5;Ohio*5;Pennsylvania*6"],
+ ["Name a country where Spanish is an official language","Spain*1;Mexico*1;Argentina*2;Colombia*2;Peru*3;Chile*3;Cuba*3;Venezuela*3;Ecuador*4;Guatemala*4;Bolivia*4;Dominican Republic*4;Honduras*4;Costa Rica*4;Panama*4;El Salvador*4;Puerto Rico*4;Nicaragua*5;Paraguay*5;Uruguay*5;Equatorial Guinea*6"],
+ ["Name a US city","New York*1;Los Angeles*1;Chicago*1;Miami*2;Houston*2;San Francisco*2;Las Vegas*2;Seattle*2;Boston*2;Dallas*3;Atlanta*3;Philadelphia*3;Denver*3;Phoenix*3;Orlando*3;New Orleans*3;Detroit*3;Austin*3;Nashville*3;San Diego*3;Portland*4;Minneapolis*4;Baltimore*4;Pittsburgh*4;Cleveland*4;Salt Lake City*4;Kansas City*4;St Louis/Saint Louis*4;Charlotte*4;Indianapolis*4;Memphis*4;Honolulu*4;Albuquerque*5;Anchorage*5;Milwaukee*5;Tucson*5;Omaha*5;Boise*5;Sacramento*5;Savannah*5;Buffalo*5;Tulsa*5;El Paso*5;Spokane*5;Fargo*5;Duluth*6"],
+ ["Name a fish people eat","Salmon*1;Tuna*1;Cod*2;Tilapia*2;Trout*3;Catfish*3;Halibut*4;Mahi-mahi*4;Sardines*4;Anchovies*4;Mackerel*4;Bass*4;Swordfish*4;Haddock*4;Snapper*4;Flounder*4;Herring*4;Sole*5;Pollock*5;Grouper*5;Perch*5;Carp*5;Branzino*5;Monkfish*5;Barramundi*5;Turbot*5;Pike*5;Walleye*5;Eel*5;Sturgeon*5;Hake*5;Orange roughy*5;Skate*5;Wahoo*6"],
+ ["Name something that is yellow","Banana*1;Sun*1;Lemon*1;Corn*2;Cheese*2;School bus*2;Sunflower*2;Rubber duck/Duck*2;Egg yolk/Yolk*3;Butter*3;Bee*3;Pineapple*3;Mustard*3;Pencil*3;Gold*3;Taxi*3;Canary*4;Daffodil*4;Dandelion*4;Highlighter*4;Smiley face*4;Tennis ball*4;Squash*4;Mango*4;Goldfinch*5;Sulfur*5;Saffron*5;Canola*5;Yellow jacket*5;Marigold*5;Buttercup*5;Bananaquit*6"],
+ ["Name a metal element","Iron*1;Gold*1;Silver*1;Copper*1;Aluminum/Aluminium*2;Lead*2;Zinc*3;Tin*3;Platinum*3;Nickel*3;Titanium*3;Magnesium*4;Mercury*4;Sodium*4;Potassium*4;Calcium*4;Lithium*4;Chromium*4;Uranium*4;Tungsten*4;Cobalt*4;Plutonium*5;Cesium/Caesium*5;Barium*5;Manganese*5;Bismuth*5;Palladium*5;Gallium*5;Osmium*5;Iridium*5;Vanadium*5;Beryllium*5;Strontium*5;Radium*5;Rhodium*5;Indium*5;Cadmium*5;Thallium*5;Molybdenum*5;Zirconium*5;Francium*5;Rubidium*5;Tantalum*5;Niobium*5;Hafnium*5;Rhenium*5;Ruthenium*5;Scandium*5;Yttrium*5;Lanthanum*5;Neodymium*5;Europium*5;Thorium*5;Americium*5;Einsteinium*5;Lutetium*6"],
+ ["Name a type of shoe","Sneakers/Trainers*1;Boots*1;Sandals*1;High heels/Heels*2;Flip flops*2;Slippers*2;Loafers*3;Crocs*3;Cleats*3;Flats*3;Hiking boots*3;Rain boots/Wellies/Galoshes*3;Cowboy boots*3;Clogs*4;Moccasins*4;Oxfords*4;Wedges*4;Pumps*4;Stilettos*4;Platforms/Platform shoes*4;Ballet shoes*4;Tap shoes*4;Ice skates*4;Roller skates*4;Combat boots*4;Snow boots*4;Boat shoes*4;Espadrilles*5;Mules*5;Brogues*5;Chelsea boots*5;Mary Janes*5;Kitten heels*5;Derby*5;Waders*5;Jelly shoes*5;Huaraches*5;Sabots*5;Monk strap*5;Geta*6"],
+ ["Name an animal that hibernates","Bear*1;Bat*2;Groundhog/Woodchuck*2;Hedgehog*2;Ground squirrel/Squirrel*3;Chipmunk*3;Frog*3;Turtle*3;Snake*3;Skunk*4;Dormouse*4;Ladybug*4;Bee/Bumblebee*4;Snail*4;Marmot*4;Prairie dog*5;Badger*5;Common poorwill/Poorwill*5;Echidna*5;Hamster*5;Fat-tailed dwarf lemur*6"],
+ ["Name an ocean animal without a backbone","Jellyfish*1;Octopus*1;Squid*2;Starfish/Sea star*2;Crab*2;Lobster*2;Shrimp*2;Sea urchin*3;Clam*3;Oyster*3;Coral*3;Sea anemone/Anemone*3;Sponge*3;Hermit crab*3;Sea snail*4;Sea cucumber*4;Mussel*4;Scallop*4;Nautilus*4;Cuttlefish*4;Krill*4;Barnacle*4;Sand dollar*4;Portuguese man o' war/Man o' war*4;Sea slug*4;Horseshoe crab*4;Nudibranch*5;Conch*5;Brittle star*5;Comb jelly*5;Sea pen*5;Sea squirt*5;Feather star*5;Tube worm*5;Abalone*5;Limpet*5;Isopod*5;Copepod*5;Salp*6"],
+ ["Name a color","Red*1;Blue*1;Green*1;Yellow*1;Purple*1;Orange*1;Pink*2;Black*2;White*2;Brown*2;Gray/Grey*2;Teal*3;Turquoise*3;Maroon*3;Navy*3;Magenta*3;Cyan*3;Beige*3;Lavender*3;Gold*3;Silver*3;Violet*3;Lime*3;Tan*3;Indigo*4;Crimson*4;Scarlet*4;Coral*4;Olive*4;Burgundy*4;Mint*4;Peach*4;Salmon*4;Ivory*4;Charcoal*4;Fuchsia*4;Amber*4;Mustard*4;Khaki*4;Aquamarine*5;Chartreuse*5;Periwinkle*5;Mauve*5;Ochre*5;Sienna*5;Taupe*5;Cerulean*5;Vermilion*5;Sepia*5;Puce*5;Viridian*5;Cobalt*5;Ultramarine*5;Saffron*5;Celadon*5;Gamboge*6"],
+ ["Name a type of cheese","Cheddar*1;Mozzarella*1;Swiss*1;Parmesan*2;American*2;Brie*3;Feta*3;Gouda*3;Provolone*3;Pepper jack*3;Monterey Jack*3;Colby*3;Ricotta*3;Cream cheese*3;Blue cheese*3;Cottage cheese*3;Camembert*4;Gruyere*4;Goat cheese*4;Havarti*4;Muenster*4;Halloumi*4;Mascarpone*4;Gorgonzola*4;Manchego*4;Asiago*4;Burrata*4;Paneer*4;Queso fresco*4;Roquefort*5;Stilton*5;Edam*5;Emmental*5;Pecorino*5;Fontina*5;Limburger*5;Taleggio*5;Raclette*5;Comte*5;Jarlsberg*5;Wensleydale*5;Epoisses*6"],
+ ["Name something you'd find in a classroom","Desk*1;Chair*1;Whiteboard/Board*1;Pencil*1;Teacher*1;Book*2;Computer*2;Clock*2;Paper*2;Chalkboard/Blackboard*2;Marker*2;Eraser*2;Pen*2;Projector*3;Backpack*3;Globe*3;Flag*3;Scissors*3;Glue*3;Calculator*3;Map*3;Ruler*3;Pencil sharpener*3;Stapler*3;Crayons*3;Trash can*3;Window*3;Laptop*3;Notebook*3;Chalk*3;Poster*4;Bookshelf*4;Calendar*4;Tissues*4;Bulletin board*4;Smartboard*4;Highlighter*4;Hand sanitizer*4;Tape*4;Clipboard*5;Hole punch*5;Fire extinguisher*5;Thermostat*5;Speaker*5;Plant*5;Fish tank*5;Periodic table*5;Microscope*5;Pointer*5;Podium*5;Lectern*6"],
+ ["Name a famous painting","Mona Lisa*1;The Starry Night/Starry Night*1;The Scream*2;The Last Supper*2;Girl with a Pearl Earring*3;The Persistence of Memory*3;The Birth of Venus*3;American Gothic*3;The Creation of Adam*3;Water Lilies*4;The Great Wave off Kanagawa/The Great Wave*4;The Night Watch*4;Guernica*4;The Kiss*4;Sunflowers*4;Whistler's Mother*5;Las Meninas*5;The Garden of Earthly Delights*5;A Sunday Afternoon on the Island of La Grande Jatte*5;Nighthawks*5;Liberty Leading the People*5;The School of Athens*5;Impression Sunrise*5;Campbell's Soup Cans*5;The Son of Man*5;The Arnolfini Portrait*6"],
+ ["Name an ancient Egyptian god or goddess","Ra*1;Anubis*1;Osiris*2;Isis*2;Horus*2;Set/Seth*3;Thoth*3;Bastet/Bast*3;Hathor*4;Sobek*4;Amun/Amon/Amun-Ra*4;Sekhmet*4;Maat*4;Aten*4;Ptah*5;Nut*5;Geb*5;Shu*5;Tefnut*5;Nephthys*5;Khonsu*5;Khepri*5;Bes*5;Taweret*5;Neith*5;Hapi*5;Wadjet*5;Atum*5;Seshat*5;Serqet*5;Montu*5;Mut*5;Khnum*6"],
+ ["Name an item of clothing","Shirt*1;T-shirt*1;Pants/Trousers*1;Socks*1;Jacket*2;Hat*2;Dress*2;Shorts*2;Skirt*2;Hoodie*2;Sweater/Jumper*2;Jeans*2;Coat*2;Scarf*3;Gloves*3;Tie*3;Belt*3;Vest*3;Underwear*3;Pajamas/Pyjamas*3;Leggings*3;Beanie*3;Suit*3;Tank top*3;Blazer*4;Cardigan*4;Overalls*4;Mittens*4;Poncho*4;Kimono*4;Tuxedo*4;Bow tie*4;Jumpsuit*4;Kilt*4;Robe*4;Cape*4;Bandana*4;Turtleneck*4;Polo*4;Parka*4;Windbreaker*4;Trench coat*4;Onesie*4;Sombrero*4;Beret*4;Fedora*4;Sari*5;Romper*5;Tunic*5;Toga*5;Sarong*5;Dungarees*5;Waistcoat*5;Ascot*5;Balaclava*5;Corset*5;Leotard*5;Bowler hat*5;Fez*5;Petticoat*5;Smock*5;Cummerbund*6"],
+ ["Name a famous athlete","Michael Jordan/Jordan*1;LeBron James/LeBron*1;Lionel Messi/Messi*1;Cristiano Ronaldo/Ronaldo*1;Serena Williams*2;Usain Bolt/Bolt*2;Tom Brady/Brady*2;Michael Phelps/Phelps*2;Simone Biles/Biles*2;Muhammad Ali*2;Kobe Bryant/Kobe*2;Stephen Curry/Steph Curry/Curry*2;Tiger Woods*2;Babe Ruth*3;Wayne Gretzky/Gretzky*3;Roger Federer/Federer*3;Pele*3;Shohei Ohtani/Ohtani*3;Patrick Mahomes/Mahomes*3;Rafael Nadal/Nadal*3;Novak Djokovic/Djokovic*3;Kylian Mbappe/Mbappe*3;Neymar*3;Jackie Robinson*3;Shaquille O'Neal/Shaq*3;Mike Tyson/Tyson*3;Caitlin Clark*3;Jesse Owens*4;Venus Williams*4;Billie Jean King*4;Mia Hamm*4;Megan Rapinoe/Rapinoe*4;Diego Maradona/Maradona*4;Zinedine Zidane/Zidane*4;Wilt Chamberlain*4;Kareem Abdul-Jabbar*4;Magic Johnson*4;Larry Bird*4;Lou Gehrig*4;Hank Aaron*4;Derek Jeter/Jeter*4;Floyd Mayweather/Mayweather*4;Conor McGregor/McGregor*4;Shaun White*4;Katie Ledecky/Ledecky*4;Sidney Crosby/Crosby*4;Alex Ovechkin/Ovechkin*4;Lindsey Vonn*5;Nadia Comaneci*5;Carl Lewis*5;Jim Thorpe*5;Florence Griffith Joyner/Flo Jo*5;Eliud Kipchoge/Kipchoge*5;Bo Jackson*5;Jerry Rice*5;Walter Payton*5;Jim Brown*5;Paavo Nurmi*6"],
+ ["Name a type of sandwich","Peanut butter and jelly/PB&J/PBJ*1;Grilled cheese*1;BLT*2;Club*2;Ham and cheese*2;Turkey*2;Sub/Submarine/Hoagie*2;Bacon egg and cheese*2;Reuben*3;Tuna/Tuna melt*3;Philly cheesesteak/Cheesesteak*3;Panini*3;Sloppy joe*3;Pulled pork*3;Egg salad*3;Chicken salad*3;Meatball sub*3;Hero*3;Cuban*4;Gyro*4;Banh mi*4;Po' boy/Po boy*4;Monte Cristo*4;French dip*4;Patty melt*4;Caprese*4;Falafel*4;Shawarma*4;Torta*4;Cucumber sandwich*4;Muffuletta*5;Croque monsieur*5;Katsu sando*5;Chip butty*5;Fluffernutter*5;Bocadillo*5;Smorrebrod*6"],
+ ["Name a volcano","Mount Vesuvius/Vesuvius*1;Mount St Helens*1;Mount Fuji/Fuji*2;Kilauea*2;Mauna Loa*2;Krakatoa/Krakatau*2;Mount Etna/Etna*2;Mount Pinatubo/Pinatubo*3;Yellowstone*3;Mount Tambora/Tambora*4;Eyjafjallajokull*4;Popocatepetl*4;Kilimanjaro*4;Mount Rainier/Rainier*4;Stromboli*4;Mauna Kea*4;Mount Pelee*5;Cotopaxi*5;Nevado del Ruiz*5;Mount Erebus/Erebus*5;Hekla*5;Paricutin*5;Santorini/Thera*5;Mount Merapi/Merapi*5;Taal*5;Mount Shasta/Shasta*5;Mount Hood*5;Sakurajima*5;Ojos del Salado*5;Nyiragongo*5;Mount Ruapehu*5;Mount Unzen*5;Ol Doinyo Lengai*6"],
+ ["Name a wild cat","Lion*1;Tiger*1;Cheetah*1;Leopard*2;Jaguar*2;Panther/Black panther*2;Cougar/Puma/Mountain lion*3;Snow leopard*3;Lynx*3;Bobcat*3;Ocelot*4;Clouded leopard*4;Caracal*4;Serval*4;Jaguarundi*5;Fishing cat*5;Margay*5;Sand cat*5;Pallas's cat/Manul*5;Rusty-spotted cat*5;Andean mountain cat*5;Kodkod*5;Oncilla*5;Bay cat*5;Flat-headed cat*6"],
+ ["Name a type of bread","White bread/White*1;Whole wheat/Wheat*1;Sourdough*1;Rye*2;Bagel*2;Baguette*2;Croissant*2;Pita*3;Brioche*3;Ciabatta*3;Focaccia*3;Naan*3;Tortilla*3;Cornbread*3;Banana bread*3;Biscuit*3;Dinner roll/Roll*3;Garlic bread*3;Multigrain*3;Pretzel*3;Pumpernickel*4;Challah*4;English muffin*4;Flatbread*4;Soda bread*4;Matzo*4;Chapati*4;Roti*4;Arepa*4;Panettone*4;Paratha*4;Kaiser roll*4;Injera*5;Lavash*5;Bao*5;Pan dulce*5;Stollen*5;Fougasse*5;Zopf*5;Bannock*5;Pandesal*5;Grissini*5;Damper*6"],
+ ["Name a word that ends in -ology","Biology*1;Technology*1;Geology*2;Psychology*2;Zoology*2;Mythology*2;Apology*2;Ecology*3;Astrology*3;Sociology*3;Archaeology/Archeology*3;Meteorology*3;Paleontology*3;Anthology*3;Anthropology*4;Theology*4;Chronology*4;Cardiology*4;Neurology*4;Ideology*4;Methodology*4;Terminology*4;Criminology*4;Dermatology*4;Radiology*4;Etymology*4;Pathology*4;Numerology*4;Oncology*5;Ornithology*5;Entomology*5;Herpetology*5;Ichthyology*5;Mycology*5;Seismology*5;Musicology*5;Virology*5;Pharmacology*5;Toxicology*5;Volcanology*5;Speleology*5;Graphology*5;Tautology*5;Dendrochronology*6"],
+ ["Name something related to Halloween","Pumpkin/Jack-o'-lantern*1;Ghost*1;Witch*1;Candy*1;Costume*1;Skeleton*2;Bat*2;Spider*2;Black cat*2;Vampire*2;Zombie*2;Trick or treat*2;Mummy*3;Werewolf*3;Haunted house*3;Broomstick/Broom*3;Cauldron*3;Candy corn*3;Spider web/Cobweb*3;Tombstone/Gravestone*3;Frankenstein*3;Skull*3;Graveyard/Cemetery*3;Monster*3;Owl*4;Scarecrow*4;Candle*4;Moon*4;Goblin*4;Raven*4;Crow*4;Corn maze*4;Caramel apple*4;Coffin*4;Pitchfork*5;Bobbing for apples*5;Hayride*5;Ouija board*5;Banshee*5;Gargoyle*5;Will-o'-the-wisp*6"],
+ ["Name a fruit","Apple*1;Banana*1;Orange*1;Strawberry*1;Grape*1;Watermelon*2;Mango*2;Pineapple*2;Peach*2;Pear*2;Blueberry*2;Cherry*2;Kiwi*3;Lemon*3;Lime*3;Plum*3;Raspberry*3;Coconut*3;Papaya*3;Pomegranate*3;Grapefruit*3;Cantaloupe*3;Blackberry*3;Tangerine/Clementine/Mandarin*3;Apricot*4;Avocado*4;Fig*4;Nectarine*4;Honeydew*4;Dragon fruit*4;Passion fruit*4;Guava*4;Lychee*4;Date*4;Cranberry*4;Jackfruit*4;Plantain*4;Persimmon*5;Starfruit/Carambola*5;Durian*5;Kumquat*5;Rambutan*5;Mangosteen*5;Quince*5;Gooseberry*5;Elderberry*5;Mulberry*5;Tamarind*5;Loquat*5;Soursop*5;Ackee*5;Feijoa*5;Pawpaw*5;Salak*5;Cloudberry*5;Yuzu*5;Ugli fruit*5;Jabuticaba*6"],
+ ["Name a famous castle","Windsor Castle/Windsor*2;Edinburgh Castle*2;Neuschwanstein Castle/Neuschwanstein*2;Tower of London*3;Himeji Castle/Himeji*3;Bran Castle/Dracula's Castle*4;Prague Castle*4;Balmoral*4;Warwick Castle*4;Blarney Castle*4;Hearst Castle*4;Dover Castle*4;Osaka Castle*4;Leeds Castle*5;Chateau de Chambord/Chambord*5;Alcazar of Segovia*5;Hohenzollern Castle*5;Conwy Castle*5;Caernarfon Castle*5;Bodiam Castle*5;Malbork Castle*5;Stirling Castle*5;Matsumoto Castle*5;Eilean Donan*5;Bled Castle*5;Peles Castle*5;Kronborg*5;Spis Castle*5;Bamburgh Castle*5;Glamis Castle*5;Chateau Frontenac*5;Krak des Chevaliers*6"],
+ ["Name a sea in the world","Mediterranean*1;Caribbean*1;Red Sea*2;Dead Sea*2;Black Sea*2;Caspian Sea*3;North Sea*3;Baltic Sea*3;Arabian Sea*4;South China Sea*4;Sea of Japan*4;Bering Sea*4;Coral Sea*4;Adriatic*4;Aegean*4;Tasman Sea*5;Yellow Sea*5;Sargasso Sea*5;Barents Sea*5;Ionian Sea*5;Weddell Sea*5;Ross Sea*5;Sea of Okhotsk*5;Labrador Sea*5;Andaman Sea*5;Celebes Sea*5;Tyrrhenian Sea*5;Ligurian Sea*5;Kara Sea*5;Laptev Sea*5;Sulu Sea*5;Beaufort Sea*6"],
+ ["Name a vehicle with wheels","Car*1;Bike/Bicycle*1;Bus*1;Truck*1;Motorcycle*2;Train*2;Skateboard*2;Scooter*2;Van*2;Tractor*3;Ambulance*3;Fire truck/Fire engine*3;Taxi*3;Tricycle*3;Golf cart*3;Limousine/Limo*3;Monster truck*4;Tank*4;Forklift*4;Bulldozer*4;Dump truck*4;Go-kart/Go kart*4;Unicycle*4;Wagon*4;Wheelchair*4;Roller skates*4;Tram/Streetcar*4;Segway*5;Rickshaw*5;Tuk-tuk*5;Carriage*5;Stagecoach*5;Chariot*5;Steamroller*5;Excavator*5;Snowplow*5;Hearse*5;Velocipede*6"],
+ ["Name a planet's feature or space object","Star*1;Moon*1;Sun*1;Comet*2;Asteroid*2;Galaxy*2;Black hole*2;Meteor*2;Nebula*3;Meteorite*3;Supernova*3;Constellation*3;Dwarf planet*4;Quasar*4;Pulsar*4;Neutron star*4;White dwarf*4;Red giant*4;Exoplanet*4;Wormhole*4;Brown dwarf*5;Magnetar*5;Kuiper Belt*5;Oort Cloud*5;Nova*5;Blazar*5;Protostar*5;Globular cluster*5;Accretion disk*5;Lagrange point*6"],
+ ["Name a farm crop","Corn/Maize*1;Wheat*1;Rice*1;Soybeans/Soy*2;Potatoes*2;Cotton*2;Barley*3;Oats*3;Sugarcane*3;Tomatoes*3;Peanuts*3;Sunflowers*3;Alfalfa*4;Canola/Rapeseed*4;Sorghum*4;Rye*4;Tobacco*4;Hay*3;Sugar beet*4;Coffee*4;Cocoa*4;Tea*4;Lentils*4;Millet*5;Quinoa*5;Hops*5;Flax*5;Cassava*5;Chickpeas*5;Buckwheat*5;Hemp*5;Jute*5;Sesame*5;Teff*6"],
+];
+
+// ===================== FISH =====================
+const RARITY = [
+  { name: "Common",    color: "#c9d6df" },
+  { name: "Uncommon",  color: "#6fd36f" },
+  { name: "Rare",      color: "#4fa8ff" },
+  { name: "Epic",      color: "#b36bff" },
+  { name: "Legendary", color: "#ffb02e" },
+  { name: "Mythic",    color: "#ff5f7a" },
+  { name: "Secret",    color: "#ff4fd8" },
+];
+// shape, body, belly, fin, accent, pattern
+const FISH = [
+  ["minnow","Minnow",0,"classic","#9fb4b8","#dfe8e6","#7d9296","#5c7377","hstripe"],
+  ["bluegill","Bluegill",0,"round","#4f7fa6","#e8b04a","#3d6283","#2d4a63","vstripe"],
+  ["perch","Yellow Perch",0,"classic","#c9b03b","#efe3a0","#d0602c","#4b5a2a","vstripe"],
+  ["sardine","Sardine",0,"long","#7aa0c4","#e8f0f5","#5c7fa1","#2f4f7a","spots"],
+  ["goby","Goby",0,"classic","#b59a73","#e2d2b4","#8c7354","#5e4a33","spots"],
+  ["crappie","Crappie",0,"round","#b8c0b0","#e9ece4","#8b9584","#3a4436","spots"],
+  ["anchovy","Anchovy",0,"long","#9ab7c7","#e4eef2","#6f8fa1","#c9d7de","hstripe"],
+  ["carp","Mud Carp",0,"classic","#8a7a4a","#c9b987","#6b5d36","#5a4b2a","none"],
+  ["bass","Largemouth Bass",1,"classic","#5f8a3c","#d8e0a8","#47692d","#2f4a1d","hstripe"],
+  ["trout","Rainbow Trout",1,"classic","#8aa36d","#f1e7d6","#6a7f53","#e0697a","hstripe"],
+  ["catfish","Catfish",1,"classic","#5f6670","#b9bcc2","#474d55","#3a3f46","none"],
+  ["clown","Clownfish",1,"round","#ff7a1f","#ff9a4a","#1d1d1d","#ffffff","vstripe"],
+  ["mackerel","Mackerel",1,"classic","#3f7f8c","#e4ecef","#2e5f6a","#173b44","vstripe"],
+  ["pike","Northern Pike",1,"long","#5c7a3d","#e3e2b8","#6b5a2a","#d9d48a","spots"],
+  ["tang","Blue Tang",1,"round","#2d6ee6","#3f7fee","#f2d32b","#13235c","band"],
+  ["salmon","Sockeye Salmon",2,"classic","#d8413a","#f0a090","#3f6b44","#a8302a","none"],
+  ["puffer","Pufferfish",2,"round","#d9c47a","#f5edd0","#b39f58","#6a5a2a","spots"],
+  ["barracuda","Barracuda",2,"long","#8fa3ad","#e6ecef","#5e7280","#2d3a42","spots"],
+  ["mahi","Mahi-mahi",2,"classic","#3fae6f","#f2d43a","#2f7fd0","#2f7fd0","spots"],
+  ["lion","Lionfish",2,"round","#f0e6d8","#fff4ea","#c4442f","#b8321f","vstripe"],
+  ["eel","Electric Eel",2,"long","#3b3f2e","#d89a3a","#2a2d20","#8ff0ff","glow"],
+  ["tuna","Bluefin Tuna",3,"classic","#1f3f7a","#dfe6ee","#f0c63a","#16305e","none"],
+  ["hammer","Hammerhead",3,"shark","#7d8a99","#e3e8ee","#66727f","#55606c","none"],
+  ["manta","Manta Ray",3,"ray","#2b2f3f","#e9ecf3","#2b2f3f","#e9ecf3","spots"],
+  ["sword","Swordfish",3,"sword","#45607e","#d9e2ea","#364c66","#2a3b50","none"],
+  ["koi","Koi",3,"classic","#f4f1e9","#ffffff","#e86a2c","#e2432c","spots"],
+  ["marlin","Blue Marlin",4,"sword","#1c4f9c","#e6eef7","#163f7d","#69b6ff","vstripe"],
+  ["white","Great White",4,"shark","#6f7f8c","#f1f3f5","#5a6875","#4d5964","none"],
+  ["angler","Anglerfish",4,"angler","#3a2f3f","#4a3d50","#2a2230","#ffe86a","glow"],
+  ["oar","Oarfish",4,"long","#c9d3dc","#eef2f5","#e2403a","#8aa0b0","spots"],
+  ["coela","Coelacanth",5,"classic","#2f4d6b","#4f6d8b","#233a52","#e6eef5","spots"],
+  ["ghost","Ghost Shark",5,"shark","#b9c8d6","#e6eef5","#8fa3b8","#cde8ff","glow"],
+  ["goldkoi","Golden Koi",5,"classic","#f2c230","#ffe58a","#d99a10","#fff6c8","glow"],
+  ["sovereign","Abyssal Sovereign",6,"angler","#1a1240","#2a1f5c","#3b2a80","#ff4fd8","glow"],
+].map(([id, name, rarity, shape, body, belly, fin, accent, pattern]) => ({ id, name, rarity, shape, body, belly, fin, accent, pattern }));
+const FISH_BY_ID = Object.fromEntries(FISH.map(f => [f.id, f]));
+
+// Pixel templates, head on the left. B body, b belly, F fin, E eye, W teeth, 1 lure light.
+const TEMPLATES = {
+  classic: [
+    "......FFF.......",
+    "....FFBBBF......",
+    "..BBBBBBBBBB..FF",
+    ".BEBBBBBBBBBBFFF",
+    "BBBBBBBBBBBBBFF.",
+    ".bbbbbbbbbbbbFFF",
+    "..bbbbbbbbbb..FF",
+    "....FFbbF.......",
+  ],
+  round: [
+    "....F..F......",
+    "...FBBBBF.....",
+    "..BBBBBBBB..F.",
+    ".BBBBBBBBBB.FF",
+    ".BEBBBBBBBBBFF",
+    "BBBBBBBBBBBBF.",
+    ".bbbbbbbbbbbFF",
+    "..bbbbbbbbb.FF",
+    "...FbbbbbF..F.",
+    "....F..F......",
+  ],
+  long: [
+    "...........FFFFF.......F",
+    ".BBBBBBBBBBBBBBBBBBBB.FF",
+    "BEBBBBBBBBBBBBBBBBBBBBFF",
+    ".bbbbbbbbbbbbbbbbbbbb.FF",
+    "..........FFFF.........F",
+  ],
+  shark: [
+    "..........F...........",
+    ".........FF...........",
+    "......BBBBBBBBBB....F.",
+    "...BBBBBBBBBBBBBBB.FF.",
+    ".BBEBBBBBBBBBBBBBBBFF.",
+    "BBBBBBBBBBBBBBBBBBBF..",
+    ".bbbbbbbbbbbbbbbbb.FF.",
+    "...bbbbFbbbbbbbb...FF.",
+    "......F.........F.....",
+  ],
+  ray: [
+    "........BB........",
+    "......BBBBBB......",
+    "...BBBBBBBBBBBB...",
+    ".BBBBBEBBEBBBBBBB.",
+    "BBBBBBBBBBBBBBBBBB",
+    ".BBBBBBBBBBBBBBBB.",
+    "...BBBBBBBBBBBB...",
+    "......BBBBBB......",
+    "........FF........",
+    ".........F........",
+    "..........F.......",
+  ],
+  sword: [
+    "..............FF..........",
+    ".............FFFF........F",
+    "..........BBBBBBBBBBB...FF",
+    "........BBBBBBBBBBBBBBBFF.",
+    "BBBBBBBBBEBBBBBBBBBBBBBF..",
+    "........bbbbbbbbbbbbbbFF..",
+    "..........bbbbbbbbbb...FF.",
+    ".............F.......F....",
+  ],
+  angler: [
+    "..1.............",
+    "...F............",
+    "....F.BBBBB.....",
+    "....BBBBBBBBB..F",
+    "..BBBBEBBBBBBBFF",
+    ".BBBBBBBBBBBBBFF",
+    ".WbWbWbbbbbbbBFF",
+    "..bbbbbbbbbbbb.F",
+    "....bbbbbbbb....",
+  ],
+};
+
+const OUTLINE = "#050912";
+function buildSprite(f, silhouette) {
+  const rows = TEMPLATES[f.shape];
+  const h = rows.length, w = Math.max(...rows.map(r => r.length));
+  const filled = (x, y) => y >= 0 && y < h && x >= 0 && x < (rows[y] || "").length && rows[y][x] !== ".";
+  const mid = Math.floor(h / 2);
+  const pat = (x, y) => ({
+    vstripe: x % 4 === 1 && x > 2,
+    hstripe: y === mid,
+    spots: (x * 7 + y * 3) % 5 === 0,
+    band: x >= Math.floor(w * .3) && x <= Math.floor(w * .42),
+    glow: (x * 5 + y * 11) % 9 === 0,
+    none: false,
+  })[f.pattern];
+  const c = document.createElement("canvas");
+  c.width = w + 2; c.height = h + 2;
+  const g = c.getContext("2d");
+  for (let y = -1; y <= h; y++) for (let x = -1; x <= w; x++) {
+    let col = null;
+    if (filled(x, y)) {
+      const ch = rows[y][x];
+      if (silhouette) col = "#0e1a2c";
+      else col = ch === "B" ? (pat(x, y) ? f.accent : f.body)
+        : ch === "b" ? f.belly : ch === "F" ? f.fin : ch === "E" ? OUTLINE : ch === "W" ? "#ffffff" : f.accent;
+    } else if (filled(x-1,y) || filled(x+1,y) || filled(x,y-1) || filled(x,y+1)) {
+      col = silhouette ? "#2b4870" : OUTLINE;
+    }
+    if (col) { g.fillStyle = col; g.fillRect(x + 1, y + 1, 1, 1); }
+  }
+  return { c, w: w + 2, h: h + 2, mid: mid + 1 };
+}
+const SPRITES = {}, SILHOUETTES = {};
+FISH.forEach(f => { SPRITES[f.id] = buildSprite(f, false); SILHOUETTES[f.id] = buildSprite(f, true); });
+
+// Score bands decide which rarity you're fishing for.
+const BANDS = [0, 120, 240, 360, 460, 560];
+const bandFor = s => BANDS.reduce((b, min, i) => s >= min ? i : b, 0);
+function odds(b) {
+  const o = {}; const add = (r, p) => o[r] = +((o[r] || 0) + p).toFixed(2);
+  if (b === 5) { add(6, .5); add(4, 5); add(5, 94.5); }
+  else { add(Math.min(b + 2, 5), 1); add(b + 1, 5); if (b > 0) { add(b - 1, 5); add(b, 89); } else add(b, 94); }
+  return o;
+}
+function rollFish(score) {
+  const o = odds(bandFor(score));
+  let r = Math.random() * 100, rarity = bandFor(score);
+  for (const k of Object.keys(o).map(Number).sort((a, b) => b - a)) { r -= o[k]; if (r < 0) { rarity = k; break; } }
+  const pool = FISH.filter(f => f.rarity === rarity);
+  return pool[Math.floor(Math.random() * pool.length)];
+}
+
+// ===================== ANSWERS =====================
+const POINTS = [0, 5, 10, 35, 65, 85, 100];
+const TIERS = [null,
+  { name: "Dock", color: "var(--t1)" }, { name: "Shallows", color: "var(--t2)" }, { name: "Weed Bed", color: "var(--t3)" },
+  { name: "Drop-off", color: "var(--t4)" }, { name: "Deep Water", color: "var(--t5)" }, { name: "Trench", color: "var(--t6)" }];
+const PER_GAME = 7, MAX = PER_GAME * 100;
+
+const norm = s => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "")
+  .replace(/&/g, "and").replace(/\+/g, "plus").replace(/#/g, "sharp").replace(/^(the|a|an) /, "").replace(/[^a-z0-9]/g, "");
+
+const QUESTIONS = BANK.map(([q, raw]) => ({
+  q,
+  answers: raw.split(";").map(part => {
+    const [names, tier] = part.split("*");
+    const list = names.split("/");
+    return { label: list[0], keys: list.map(norm), tier: +tier };
+  })
+}));
+
+function lev(a, b) {
+  const d = Array.from({ length: a.length + 1 }, (_, i) => [i]);
+  for (let j = 1; j <= b.length; j++) d[0][j] = j;
+  for (let i = 1; i <= a.length; i++) for (let j = 1; j <= b.length; j++)
+    d[i][j] = Math.min(d[i-1][j] + 1, d[i][j-1] + 1, d[i-1][j-1] + (a[i-1] === b[j-1] ? 0 : 1));
+  return d[a.length][b.length];
+}
+
+// Exact match only (ignoring case, accents, spaces, "the" and plurals). Near misses go through nearby().
+function match(question, guess) {
+  const g = norm(guess);
+  if (!g) return null;
+  const variants = new Set([g, g.replace(/s$/, ""), g.replace(/es$/, ""), g + "s"]);
+  for (const a of question.answers) if (a.keys.some(k => variants.has(k))) return a;
+  return null;
+}
+
+// "Did you mean" choices, drawn only from answers this prompt accepts.
+function nearby(question, guess) {
+  const g = norm(guess);
+  if (!g) return [];
+  const found = [];
+  for (const a of question.answers) {
+    let best = Infinity;
+    for (const k of a.keys) {
+      const limit = k.length >= 8 ? 3 : k.length >= 5 ? 2 : k.length >= 3 ? 1 : 0;
+      const d = lev(g, k);
+      if (d <= limit) best = Math.min(best, d);
+      else if (g.length >= 3 && k.startsWith(g)) best = Math.min(best, limit + .5);
+    }
+    if (best < Infinity) found.push([best, a]);
+  }
+  return found.sort((x, y) => x[0] - y[0]).slice(0, 3).map(x => x[1]);
+}
+
+// ===================== STORAGE =====================
+const store = {
+  get(k, d) { try { const v = JSON.parse(localStorage.getItem(k)); return v ?? d; } catch { return d; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} }
+};
+let collection = store.get("rc3-collection", { minnow: 1 });
+let equipped = store.get("rc3-equipped", "minnow");
+if (!FISH_BY_ID[equipped]) equipped = "minnow";
+
+// ===================== SCENE =====================
+const cv = document.getElementById("sea");
+const ctx = cv.getContext("2d");
+ctx.imageSmoothingEnabled = false;
+const W = 320, H = 200, SURF = 46, HOOKX = 200, TIPY = SURF - 30;
+const depthY = s => SURF + 22 + s * 0.62;
+const WORLD_H = depthY(MAX) + 40;
+const ZONE_WATER = ["#2a86a6", "#21708f", "#1a5a78", "#144561", "#0e3049", "#081c30"];
+const ZONE_WATER_HI = ["#3a9cbc", "#2d82a1", "#246b8a", "#1c5572", "#153d59", "#0f2740"];
+const scene = {
+  score: 0, from: 0, to: 0, t0: 0, cam: 0, worm: true,
+  catchFish: null, catchT0: 0, catchDone: null, sparkle: 0,
+  ambient: Array.from({ length: 16 }, (_, i) => ({
+    x: Math.random() * W, y: SURF + 20 + Math.random() * (WORLD_H - SURF - 30),
+    v: (Math.random() * .25 + .1) * (Math.random() < .5 ? -1 : 1), s: Math.random() < .3 ? 2 : 1
+  })),
+  bubbles: [],
+};
+const ease = t => 1 - Math.pow(1 - Math.min(1, Math.max(0, t)), 3);
+function hookScore(now) { return scene.from + (scene.to - scene.from) * ease((now - scene.t0) / 1400); }
+function sinkTo(score) { scene.from = hookScore(performance.now()); scene.to = score; scene.t0 = performance.now(); }
+function resetHook() { scene.from = scene.to = 0; scene.t0 = 0; scene.catchFish = null; }
+
+function px(x, y, w, h, c) { ctx.fillStyle = c; ctx.fillRect(Math.round(x), Math.round(y), w, h); }
+function pline(x0, y0, x1, y1, c) {
+  x0 = Math.round(x0); y0 = Math.round(y0); x1 = Math.round(x1); y1 = Math.round(y1);
+  const dx = Math.abs(x1 - x0), dy = -Math.abs(y1 - y0), sx = x0 < x1 ? 1 : -1, sy = y0 < y1 ? 1 : -1;
+  let err = dx + dy; ctx.fillStyle = c;
+  for (let i = 0; i < 800; i++) { ctx.fillRect(x0, y0, 1, 1); if (x0 === x1 && y0 === y1) break; const e2 = 2 * err; if (e2 >= dy) { err += dy; x0 += sx; } if (e2 <= dx) { err += dx; y0 += sy; } }
+}
+function drawSprite(sp, x, y, scale = 1) { ctx.drawImage(sp.c, Math.round(x), Math.round(y), sp.w * scale, sp.h * scale); }
+
+function draw(now) {
+  const t = now / 1000;
+  const hs = hookScore(now);
+  const hookY = depthY(hs);
+  const target = Math.max(0, Math.min(WORLD_H - H, hookY - 110));
+  scene.cam += (target - scene.cam) * 0.08;
+  const cam = Math.round(scene.cam);
+  const Y = y => Math.round(y - cam);
+
+  // Sky in dusk bands
+  const sky = ["#1b1f4a", "#2f2f66", "#5a3f78", "#a35a7c", "#e0846e", "#f2b06a"];
+  const bandH = Math.ceil(SURF / sky.length);
+  sky.forEach((c, i) => px(0, Y(i * bandH), W, bandH, c));
+  // Stars
+  for (let i = 0; i < 18; i++) if ((i * 37 + Math.floor(t * 2)) % 7) px((i * 53) % W, Y((i * 17) % 18 + 2), 1, 1, "#f4ead2");
+  // Sun sinking into the lake
+  for (let r = 0; r < 12; r++) { const half = Math.round(Math.sqrt(144 - r * r)); px(262 - half, Y(SURF - r - 1), half * 2, 1, r > 8 ? "#ffd27a" : "#ffb85c"); }
+  // Clouds
+  [[30, 10, 26], [96, 18, 18], [230, 8, 22]].forEach(([x, y, w], i) => {
+    const cx = (x + t * (2 + i)) % (W + 40) - 30;
+    px(cx, Y(y), w, 3, "#c9a2c8"); px(cx + 4, Y(y - 2), w - 10, 2, "#e0bcd4");
+  });
+
+  // Water zones, one per fish-rarity band
+  for (let i = 0; i < 6; i++) {
+    const top = i === 0 ? SURF : depthY(BANDS[i]);
+    const bottom = i === 5 ? WORLD_H + 10 : depthY(BANDS[i + 1]);
+    px(0, Y(top), W, bottom - top + 1, ZONE_WATER[i]);
+    // Dithered seam into the next zone
+    if (i < 5) for (let x = 0; x < W; x += 2) { px(x + ((x / 2) % 2), Y(bottom - 2), 1, 1, ZONE_WATER[i + 1]); px(x, Y(bottom - 1), 1, 1, ZONE_WATER[i + 1]); }
+    if (i > 0) {
+      ctx.font = "8px 'Press Start 2P', monospace"; ctx.textAlign = "right";
+      ctx.fillStyle = OUTLINE; ctx.fillText(`${RARITY[i].name.toUpperCase()} ${BANDS[i]}`, W - 5, Y(top) + 13);
+      ctx.fillStyle = RARITY[i].color; ctx.fillText(`${RARITY[i].name.toUpperCase()} ${BANDS[i]}`, W - 6, Y(top) + 12);
+    }
+  }
+  ctx.font = "8px 'Press Start 2P', monospace"; ctx.textAlign = "right";
+  ctx.fillStyle = OUTLINE; ctx.fillText("COMMON 0", W - 5, Y(SURF) + 21);
+  ctx.fillStyle = RARITY[0].color; ctx.fillText("COMMON 0", W - 6, Y(SURF) + 20);
+
+  // Light shafts near the surface
+  ctx.globalAlpha = .08;
+  for (let i = 0; i < 4; i++) { const x = 30 + i * 70 + Math.sin(t * .5 + i) * 6; for (let y = 0; y < 90; y += 2) px(x + y * .4, Y(SURF + y), 10, 2, "#ffffff"); }
+  ctx.globalAlpha = 1;
+
+  // Surface ripples
+  for (let x = 0; x < W; x += 6) px(x + Math.round(Math.sin(t * 2 + x * .1) * 2), Y(SURF), 4, 1, ZONE_WATER_HI[0]);
+  px(0, Y(SURF), W, 1, "#7fd3e6");
+
+  // Background fish silhouettes
+  ctx.globalAlpha = .28;
+  scene.ambient.forEach(a => {
+    a.x += a.v; if (a.x < -12) a.x = W + 12; if (a.x > W + 12) a.x = -12;
+    const s = a.s;
+    px(a.x, Y(a.y), 6 * s, 2 * s, OUTLINE); px(a.x + (a.v > 0 ? -2 * s : 6 * s), Y(a.y) - s, 2 * s, 4 * s, OUTLINE);
+  });
+  ctx.globalAlpha = 1;
+
+  // Boat and angler at the surface
+  const bob = Math.round(Math.sin(t * 1.6));
+  const by = Y(SURF) + bob;
+  px(136, by - 6, 56, 4, "#8a5634"); px(140, by - 2, 48, 3, "#6b3e26"); px(146, by + 1, 36, 2, "#4a2a1a");
+  px(136, by - 7, 56, 1, "#c98a5a");
+  px(170, by - 16, 6, 9, "#3b6fb6"); px(170, by - 22, 6, 6, "#f1c27d"); px(169, by - 24, 8, 2, "#d94f3d"); px(176, by - 23, 3, 1, "#d94f3d");
+  pline(176, by - 12, HOOKX, Y(TIPY) + bob, "#d9a066");
+  pline(177, by - 12, HOOKX + 1, Y(TIPY) + bob, "#a8743f");
+  px(177, by - 12, 3, 3, "#555");
+
+  // Fishing line and hook
+  const hy = Y(hookY);
+  pline(HOOKX, Y(TIPY) + bob, HOOKX, hy, "#e8eef0");
+  px(HOOKX - 1, Y(SURF) - 3, 3, 3, "#ff6f4f"); px(HOOKX - 1, Y(SURF), 3, 1, "#f4ead2");
+  // Hook
+  px(HOOKX, hy, 1, 6, "#c9d1d9"); px(HOOKX + 1, hy + 6, 2, 1, "#c9d1d9"); px(HOOKX + 3, hy + 3, 1, 3, "#c9d1d9"); px(HOOKX + 3, hy + 2, 1, 1, "#ffffff");
+  // Worm
+  if (scene.worm) {
+    const wg = Math.round(Math.sin(t * 6));
+    px(HOOKX - 2, hy + 4 + wg, 2, 2, "#ff7aa2"); px(HOOKX + 1, hy + 7, 3, 2, "#ff7aa2"); px(HOOKX + 4, hy + 5 - wg, 2, 2, "#ff7aa2"); px(HOOKX - 3, hy + 6 + wg, 1, 2, "#e0567f");
+  }
+  // Bubbles
+  if (Math.random() < .06) scene.bubbles.push({ x: HOOKX + 2 + Math.random() * 6, y: hookY, life: 0 });
+  scene.bubbles = scene.bubbles.filter(b => b.y > SURF + 2 && b.life < 400);
+  scene.bubbles.forEach(b => { b.y -= .5; b.life++; b.x += Math.sin(b.life * .1) * .2; px(b.x, Y(b.y), 2, 2, "#bfe8f5"); px(b.x, Y(b.y), 1, 1, "#ffffff"); });
+
+  // Your equipped fish swims beside the hook
+  const buddy = SPRITES[equipped];
+  if (buddy && !scene.catchFish) drawSprite(buddy, HOOKX + 12 + Math.sin(t * 1.3) * 4, hy - buddy.mid + Math.sin(t * 2.1) * 2);
+
+  // Catch sequence: the fish swims in and bites the worm
+  if (scene.catchFish) {
+    const sp = SPRITES[scene.catchFish.id];
+    const scale = scene.catchFish.rarity >= 5 ? 2 : 1;
+    const p = (now - scene.catchT0) / 1800;
+    const x = W + 10 + (HOOKX + 1 - W - 10) * ease(p);
+    const shake = p > 1 && p < 1.35 ? Math.round(Math.sin(now / 25)) : 0;
+    if (scene.catchFish.rarity >= 4) {
+      ctx.globalAlpha = .25 + .1 * Math.sin(t * 4); ctx.fillStyle = scene.catchFish.accent;
+      ctx.fillRect(Math.round(x) - 4, hy - sp.mid * scale - 4, sp.w * scale + 8, sp.h * scale + 8); ctx.globalAlpha = 1;
+    }
+    drawSprite(sp, x + shake, hy + 5 - sp.mid * scale, scale);
+    if (p > 1) {
+      scene.worm = false;
+      const k = Math.floor((now - scene.catchT0 - 1800) / 90);
+      for (let i = 0; i < 8; i++) { const a = i / 8 * Math.PI * 2, r = 8 + (k % 6) * 2; px(HOOKX + Math.cos(a) * r, hy + 5 + Math.sin(a) * r, 2, 2, i % 2 ? "#ffd84d" : "#ffffff"); }
+      ctx.font = "8px 'Press Start 2P', monospace"; ctx.textAlign = "center";
+      ctx.fillStyle = OUTLINE; ctx.fillText("CHOMP!", HOOKX + 1, hy - 17); ctx.fillStyle = "#ffd84d"; ctx.fillText("CHOMP!", HOOKX, hy - 18);
+    }
+    if (p > 1.8 && scene.catchDone) { const cb = scene.catchDone; scene.catchDone = null; cb(); }
+  }
+
+  document.getElementById("hudL").textContent = `DEPTH ${Math.round(hs)} FT`;
+  requestAnimationFrame(draw);
+}
+requestAnimationFrame(draw);
+
+// ===================== UI =====================
+const panel = document.getElementById("panel");
+const hudR = document.getElementById("hudR");
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
+const today = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; };
+function rng(seed) { return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+function pick(rand) {
+  const idx = QUESTIONS.map((_, i) => i);
+  for (let i = idx.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [idx[i], idx[j]] = [idx[j], idx[i]]; }
+  return idx.slice(0, PER_GAME);
+}
+let game = null;
+
+function showBest() { document.getElementById("best").textContent = `BEST ${store.get("rc3-best", 0)}/${MAX}`; }
+function toast(text, color) {
+  const el = document.getElementById("toast");
+  el.textContent = text; el.style.color = color; el.classList.remove("show"); void el.offsetWidth; el.classList.add("show");
+}
+function fishCanvas(f, silhouette, scale = 6) {
+  const sp = (silhouette ? SILHOUETTES : SPRITES)[f.id];
+  const c = document.createElement("canvas");
+  c.width = 30 * scale; c.height = 14 * scale;
+  const g = c.getContext("2d"); g.imageSmoothingEnabled = false;
+  const s = Math.min(scale, Math.floor((c.width - 8) / sp.w), Math.floor((c.height - 4) / sp.h));
+  g.drawImage(sp.c, Math.round((c.width - sp.w * s) / 2), Math.round((c.height - sp.h * s) / 2), sp.w * s, sp.h * s);
+  return c;
+}
+
+function home() {
+  stopTimer(); game = null; resetHook(); scene.worm = true; hudR.textContent = "";
+  const played = store.get("rc3-daily", "") === today();
+  panel.innerHTML = `
+    <h2>Cast for the answer nobody else will think of.</h2>
+    <ul class="rules">
+      <li>${PER_GAME} prompts, ${LIMIT} seconds each. Only answers on the list count, so keep guessing until one lands.</li>
+      <li>Rarer correct answers score more. Your hook sinks deeper with every point and stays there.</li>
+      <li>At the end, a fish bites the worm. The deeper you are, the rarer the fish.</li>
+      <li>Collect fish in your tackle box and equip one to swim beside your hook.</li>
+    </ul>
+    <div class="tiers">${[1,2,3,4,5,6].map(t => `<div class="tier"><small>${TIERS[t].name.toUpperCase()}</small><b style="color:${TIERS[t].color}">+${POINTS[t]}</b></div>`).join("")}</div>
+    <div class="row">
+      <button class="btn" id="daily" type="button">${played ? "REPLAY TODAY" : "TODAY'S TRIP"}</button>
+      <button class="btn alt" id="random" type="button">RANDOM TRIP</button>
+    </div>
+    <p class="note">Today's trip uses the same ${PER_GAME} prompts for everyone on ${today()}, so your class can compare scores. ${QUESTIONS.length} prompts in the bank. Only one answer per prompt reaches the Trench.</p>`;
+  document.getElementById("daily").onclick = () => start(true);
+  document.getElementById("random").onclick = () => start(false);
+}
+
+function start(daily) {
+  const seed = daily ? +today().replace(/-/g, "") : Math.floor(Math.random() * 1e9);
+  game = { daily, qs: pick(rng(seed)), i: 0, picks: [], score: 0 };
+  resetHook(); scene.worm = true;
+  ask();
+}
+const pips = () => `<div class="pips">${game.qs.map((_, i) => `<i class="${i < game.i ? "done" : i === game.i ? "now" : ""}"></i>`).join("")}</div>`;
+
+const LIMIT = 30;
+let timer = null;
+const stopTimer = () => { clearInterval(timer); timer = null; };
+
+function ask() {
+  stopTimer();
+  const q = QUESTIONS[game.qs[game.i]];
+  hudR.textContent = `SCORE ${game.score}`;
+  panel.innerHTML = `
+    ${pips()}
+    <div class="qhead"><div class="label">Cast ${game.i + 1} of ${PER_GAME}</div><div class="clock" id="clock">0:${LIMIT}</div></div>
+    <div class="timebar"><i id="timefill"></i></div>
+    <h2>${esc(q.q)}</h2>
+    <form class="cast" id="f" autocomplete="off">
+      <div class="field" id="field">
+        <input type="text" id="guess" placeholder="Type your answer" aria-label="Your answer" autocomplete="off" spellcheck="false">
+      </div>
+      <button class="btn" type="submit">CAST</button>
+    </form>
+    <div class="feedback" id="feedback" aria-live="polite"></div>
+    <p class="note">Only answers on the list count. Keep trying until the clock runs out.</p>`;
+  const input = document.getElementById("guess");
+  const field = document.getElementById("field");
+  const fb = document.getElementById("feedback");
+  const clock = document.getElementById("clock");
+  const fill = document.getElementById("timefill");
+  const end = performance.now() + LIMIT * 1000;
+  const tick = () => {
+    const left = Math.max(0, (end - performance.now()) / 1000);
+    clock.textContent = `0:${String(Math.ceil(left)).padStart(2, "0")}`;
+    fill.style.width = `${left / LIMIT * 100}%`;
+    clock.classList.toggle("low", left <= 10);
+    fill.classList.toggle("low", left <= 10);
+    if (left <= 0) { stopTimer(); reveal(null, true); }
+  };
+  tick();
+  timer = setInterval(tick, 200);
+  input.focus();
+  input.addEventListener("input", () => { fb.innerHTML = ""; });
+  document.getElementById("f").onsubmit = e => {
+    e.preventDefault();
+    const v = input.value.trim();
+    if (!v || !timer) return;
+    const ans = match(q, v);
+    if (ans) { stopTimer(); reveal(ans); return; }
+    const near = nearby(q, v);
+    if (near.length) {
+      fb.innerHTML = `<span>Did you mean</span>${near.map((a, i) => `<button class="btn alt" type="button" data-i="${i}">${esc(a.label).toUpperCase()}</button>`).join("")}`;
+      fb.querySelectorAll("button").forEach(b => b.onclick = () => { if (!timer) return; stopTimer(); reveal(near[+b.dataset.i]); });
+    } else {
+      fb.innerHTML = `<span class="nope">"${esc(v)}" isn't on the list. Try again.</span>`;
+      field.classList.remove("shake"); void field.offsetWidth; field.classList.add("shake");
+      input.select();
+    }
+  };
+}
+
+function reveal(ans, timedOut) {
+  const q = QUESTIONS[game.qs[game.i]];
+  const pts = ans ? POINTS[ans.tier] : 0;
+  game.picks.push({ q: q.q, ans, pts });
+  game.score += pts;
+  hudR.textContent = `SCORE ${game.score}`;
+  if (pts) { sinkTo(game.score); toast(`+${pts} ${TIERS[ans.tier].name.toUpperCase()}`, getComputedStyle(document.documentElement).getPropertyValue(`--t${ans.tier}`)); }
+  else toast("TIME'S UP", "#ff5f6d");
+  const last = game.i === PER_GAME - 1;
+  panel.innerHTML = `
+    ${pips()}
+    <div class="label">Cast ${game.i + 1} of ${PER_GAME}</div>
+    <h2>${esc(q.q)}</h2>
+    <div class="result">
+      ${ans
+        ? `<span class="answer">${esc(ans.label).toUpperCase()}</span><span class="tierbadge" style="background:${TIERS[ans.tier].color}">${TIERS[ans.tier].name.toUpperCase()} +${pts}</span>`
+        : `<span class="tierbadge" style="background:var(--bad)">TIME'S UP +0</span>`}
+    </div>
+    <p class="muted">${ans ? `Your hook sank to ${game.score} ft.` : "Your hook stays where it was."} ${ans && ans.tier === 6 ? "That's the single rarest answer for this prompt." : ""}</p>
+    <div class="row"><button class="btn" id="next" type="button">${last ? "WAIT FOR A BITE" : "NEXT CAST"}</button></div>`;
+  const next = document.getElementById("next");
+  next.focus();
+  next.onclick = () => { game.i++; last ? finish() : ask(); };
+}
+
+function finish() {
+  const score = game.score, band = bandFor(score);
+  if (score > store.get("rc3-best", 0)) store.set("rc3-best", score);
+  if (game.daily) store.set("rc3-daily", today());
+  showBest();
+  const fish = rollFish(score);
+  const isNew = !collection[fish.id];
+  collection[fish.id] = (collection[fish.id] || 0) + 1;
+  store.set("rc3-collection", collection);
+  panel.innerHTML = `
+    <div class="label">Final depth ${score} ft · ${RARITY[band].name} waters</div>
+    <h2>Something is circling the worm...</h2>`;
+  scene.worm = true;
+  scene.catchFish = fish; scene.catchT0 = performance.now();
+  scene.catchDone = () => showCatch(fish, isNew, score, band);
+}
+
+function showCatch(fish, isNew, score, band) {
+  const r = RARITY[fish.rarity];
+  const squares = game.picks.map(p => p.ans ? ["","⬜","🟩","🟦","🟪","🟧","🟨"][p.ans.tier] : "⬛").join("");
+  const share = `Rare Catch ${game.daily ? today() : "(random)"}: ${score}/${MAX}\n${squares}\nCaught: ${fish.name} (${r.name})`;
+  panel.innerHTML = `
+    <div class="catch">
+      <div id="catchArt"></div>
+      <div style="display:flex;flex-direction:column;gap:8px;min-width:0">
+        <div class="label">You caught</div>
+        <h2>${esc(fish.name)}</h2>
+        <div><span class="rar" style="background:${r.color}">${r.name.toUpperCase()}</span>${isNew ? `<span class="new">NEW!</span>` : `<span class="new" style="color:var(--muted)">x${collection[fish.id]}</span>`}</div>
+        <p class="note">Score ${score}/${MAX} put you in ${RARITY[band].name.toLowerCase()} waters.</p>
+      </div>
+    </div>
+    <div class="row">
+      <button class="btn" id="equip" type="button">${equipped === fish.id ? "EQUIPPED" : "EQUIP AS SKIN"}</button>
+      <button class="btn alt" id="copy" type="button">COPY SCORE</button>
+    </div>
+    <p class="note" id="copied" hidden></p>
+    <div class="recap">${game.picks.map(p => `<div><span>${esc(p.q)}<br><span style="color:${p.ans ? TIERS[p.ans.tier].color : "var(--bad)"}">${p.ans ? esc(p.ans.label) + " · " + TIERS[p.ans.tier].name : "Time's up"}</span></span><b>+${p.pts}</b></div>`).join("")}</div>
+    <div class="row">
+      <button class="btn" id="again" type="button">RANDOM TRIP</button>
+      <button class="btn alt" id="box" type="button">TACKLE BOX</button>
+      <button class="btn alt" id="home" type="button">MENU</button>
+    </div>`;
+  document.getElementById("catchArt").appendChild(fishCanvas(fish, false));
+  const eq = document.getElementById("equip");
+  eq.onclick = () => { equip(fish.id); eq.textContent = "EQUIPPED"; };
+  document.getElementById("copy").onclick = () => {
+    const c = document.getElementById("copied");
+    navigator.clipboard.writeText(share).then(() => { c.hidden = false; c.textContent = "Copied. Paste it to your friends."; })
+      .catch(() => { c.hidden = false; c.textContent = share; });
+  };
+  document.getElementById("again").onclick = () => start(false);
+  document.getElementById("box").onclick = tackleBox;
+  document.getElementById("home").onclick = home;
+}
+
+function equip(id) { equipped = id; store.set("rc3-equipped", id); }
+
+function tackleBox() {
+  stopTimer(); game = null; resetHook(); scene.worm = true; hudR.textContent = "";
+  const caught = FISH.filter(f => collection[f.id]).length;
+  panel.innerHTML = `
+    <div class="row" style="justify-content:space-between;align-items:center">
+      <h2>Tackle box</h2>
+      <span class="label">${caught} / ${FISH.length} caught</span>
+    </div>
+    <p class="muted">Tap a fish you've caught to equip it. It swims next to your hook while you play.</p>
+    <div class="grid" id="grid"></div>
+    <h2 style="font-size:1.3rem">Bite odds</h2>
+    <div class="tablewrap"><table class="odds">
+      <thead><tr><th>FINAL SCORE</th><th>WHAT BITES</th></tr></thead>
+      <tbody>${BANDS.map((min, b) => {
+        const max = b < 5 ? BANDS[b + 1] - 1 : MAX;
+        const o = odds(b);
+        const parts = Object.keys(o).map(Number).sort((a, c) => o[c] - o[a]).map(k => `<span style="color:${RARITY[k].color}">${RARITY[k].name} ${o[k]}%</span>`).join(", ");
+        return `<tr><td>${min}–${max}</td><td>${parts}</td></tr>`;
+      }).join("")}</tbody>
+    </table></div>
+    <div class="row"><button class="btn" id="home" type="button">BACK</button></div>`;
+  const grid = document.getElementById("grid");
+  FISH.forEach(f => {
+    const have = !!collection[f.id];
+    const card = document.createElement("div");
+    card.className = "fishcard" + (equipped === f.id ? " on" : "");
+    card.appendChild(fishCanvas(f, !have, 4));
+    const r = RARITY[f.rarity];
+    card.insertAdjacentHTML("beforeend", `
+      <span class="nm">${have ? esc(f.name) : "???"}</span>
+      <span class="rar" style="background:${r.color}">${r.name.toUpperCase()}</span>
+      ${have ? `<button class="btn ${equipped === f.id ? "" : "alt"}" type="button">${equipped === f.id ? "EQUIPPED" : "EQUIP"} ${collection[f.id] > 1 ? "x" + collection[f.id] : ""}</button>` : `<span class="note">Not caught yet</span>`}`);
+    const b = card.querySelector("button");
+    if (b) b.onclick = () => { equip(f.id); tackleBox(); };
+    grid.appendChild(card);
+  });
+  document.getElementById("home").onclick = home;
+}
+
+document.getElementById("tackle").onclick = tackleBox;
+showBest();
+home();
+</script>
+</body>
+</html>
