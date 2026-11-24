@@ -81,6 +81,9 @@ p { margin: 0; }
 .btn:disabled { opacity: .45; cursor: default; }
 .btn:focus-visible, input:focus-visible, .sugg li:focus-visible { outline: 3px solid var(--t2); outline-offset: 2px; }
 .row { display: flex; gap: 10px; flex-wrap: wrap; }
+.actions { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.actions .btn { font-size: 12px; padding-block: 16px; }
+@media (max-width: 480px) { .actions .btn { font-size: 10px; padding-inline: 6px; } }
 
 .pips { display: flex; gap: 6px; }
 .pips i { flex: 1; height: 10px; background: var(--shade); border: 2px solid var(--edge); }
@@ -154,7 +157,6 @@ html:fullscreen .wrap { max-width: 980px; }
       <span class="stat" id="best"></span>
       <button class="btn alt" id="mute" type="button">SOUND ON</button>
       <button class="btn alt" id="fs" type="button">FULL SCREEN</button>
-      <button class="btn alt" id="tackle" type="button">TACKLE BOX</button>
     </div>
   </header>
   <div class="stage">
@@ -162,6 +164,7 @@ html:fullscreen .wrap { max-width: 980px; }
     <div class="hud"><span id="hudL">DEPTH 0 FT</span><span id="hudR"></span></div>
     <div class="toast" id="toast"></div>
   </div>
+  <nav class="actions" id="actions" aria-label="Game menu"></nav>
   <section class="box" id="panel"></section>
 </div>
 
@@ -840,9 +843,24 @@ function fishCanvas(f, silhouette, scale = 6) {
   return c;
 }
 
+// The menu under the lake: trips and the tackle box, shown whenever you're not mid-game.
+const actions = document.getElementById("actions");
+function setActions(view) {
+  actions.hidden = view === "none";
+  if (actions.hidden) return;
+  const played = store.get("rc3-daily", "") === today();
+  actions.innerHTML = `
+    <button class="btn" id="aDaily" type="button">${played ? "REPLAY TODAY" : "TODAY'S TRIP"}</button>
+    <button class="btn" id="aRandom" type="button">NEW TRIP</button>
+    <button class="btn alt" id="aBox" type="button">${view === "box" ? "BACK" : "TACKLE BOX"}</button>`;
+  document.getElementById("aDaily").onclick = () => start(true);
+  document.getElementById("aRandom").onclick = () => start(false);
+  document.getElementById("aBox").onclick = view === "box" ? home : tackleBox;
+}
+
 function home() {
   stopTimer(); game = null; resetHook(); scene.worm = true; hudR.textContent = "";
-  const played = store.get("rc3-daily", "") === today();
+  setActions("home");
   panel.innerHTML = `
     <h2>Cast for the answer nobody else will think of.</h2>
     <ul class="rules">
@@ -852,17 +870,13 @@ function home() {
       <li>Collect fish in your tackle box and equip one to swim beside your hook.</li>
     </ul>
     <div class="tiers">${[1,2,3,4,5,6].map(t => `<div class="tier"><small>${TIERS[t].name.toUpperCase()}</small><b style="color:${TIERS[t].color}">+${POINTS[t]}</b></div>`).join("")}</div>
-    <div class="row">
-      <button class="btn" id="daily" type="button">${played ? "REPLAY TODAY" : "TODAY'S TRIP"}</button>
-      <button class="btn alt" id="random" type="button">RANDOM TRIP</button>
-    </div>
-    <p class="note">Today's trip uses the same ${PER_GAME} prompts for everyone on ${today()}, so your class can compare scores. ${QUESTIONS.length} prompts in the bank. Only one answer per prompt reaches the Trench.</p>`;
-  document.getElementById("daily").onclick = () => start(true);
-  document.getElementById("random").onclick = () => start(false);
+    <p class="note">Today's trip uses the same ${PER_GAME} prompts for everyone on ${today()}, so your class can compare scores. New trip picks ${PER_GAME} random prompts from ${QUESTIONS.length}. Only one answer per prompt reaches the Trench.</p>`;
 }
 
 function start(daily) {
   const seed = daily ? +today().replace(/-/g, "") : Math.floor(Math.random() * 1e9);
+  setActions("none");
+  window.scrollTo({ top: 0, behavior: "smooth" });
   game = { daily, qs: pick(rng(seed)), i: 0, picks: [], score: 0, rejects: [] };
   resetHook(); scene.worm = true;
   ask();
@@ -985,6 +999,7 @@ function showCatch(fish, isNew, score, band) {
   const squares = game.picks.map(p => p.ans ? ["","⬜","🟩","🟦","🟪","🟧","🟨"][p.ans.tier] : "⬛").join("");
   const share = `Rare Catch ${game.daily ? today() : "(random)"}: ${score}/${MAX}\n${squares}\nCaught: ${fish.name} (${r.name})`;
   sfx.fanfare(fish.rarity);
+  setActions("end");
   panel.innerHTML = `
     <div class="catch">
       <div id="catchArt"></div>
@@ -1007,12 +1022,7 @@ function showCatch(fish, isNew, score, band) {
     </div>
     <div class="row"><button class="btn alt" id="copyRejects" type="button">COPY THIS LIST</button></div>
     <p class="note">Think one of these should count? Copy the list and send it in so it can be added.</p>` : ""}
-    <div class="recap">${game.picks.map(p => `<div><span>${esc(p.q)}<br><span style="color:${p.ans ? TIERS[p.ans.tier].color : "var(--bad)"}">${p.ans ? esc(p.ans.label) + " · " + TIERS[p.ans.tier].name : "Time's up"}</span></span><b>+${p.pts}</b></div>`).join("")}</div>
-    <div class="row">
-      <button class="btn" id="again" type="button">RANDOM TRIP</button>
-      <button class="btn alt" id="box" type="button">TACKLE BOX</button>
-      <button class="btn alt" id="home" type="button">MENU</button>
-    </div>`;
+    <div class="recap">${game.picks.map(p => `<div><span>${esc(p.q)}<br><span style="color:${p.ans ? TIERS[p.ans.tier].color : "var(--bad)"}">${p.ans ? esc(p.ans.label) + " · " + TIERS[p.ans.tier].name : "Time's up"}</span></span><b>+${p.pts}</b></div>`).join("")}</div>`;
   document.getElementById("catchArt").appendChild(fishCanvas(fish, false));
   const eq = document.getElementById("equip");
   eq.onclick = () => { equip(fish.id); eq.textContent = "EQUIPPED"; };
@@ -1024,15 +1034,13 @@ function showCatch(fish, isNew, score, band) {
   const cr = document.getElementById("copyRejects");
   if (cr) cr.onclick = () => navigator.clipboard.writeText(game.rejects.map(r => `${r.q}: ${r.guess}`).join("\n"))
     .then(() => { cr.textContent = "COPIED"; }).catch(() => { cr.textContent = "COPY BLOCKED"; });
-  document.getElementById("again").onclick = () => start(false);
-  document.getElementById("box").onclick = tackleBox;
-  document.getElementById("home").onclick = home;
 }
 
 function equip(id) { equipped = id; store.set("rc3-equipped", id); }
 
 function tackleBox() {
   stopTimer(); game = null; resetHook(); scene.worm = true; hudR.textContent = "";
+  setActions("box");
   const caught = FISH.filter(f => collection[f.id]).length;
   panel.innerHTML = `
     <div class="row" style="justify-content:space-between;align-items:center">
@@ -1050,8 +1058,7 @@ function tackleBox() {
         const parts = Object.keys(o).map(Number).sort((a, c) => o[c] - o[a]).map(k => `<span style="color:${RARITY[k].color}">${RARITY[k].name} ${o[k]}%</span>`).join(", ");
         return `<tr><td>${min}–${max}</td><td>${parts}</td></tr>`;
       }).join("")}</tbody>
-    </table></div>
-    <div class="row"><button class="btn" id="home" type="button">BACK</button></div>`;
+    </table></div>`;
   const grid = document.getElementById("grid");
   FISH.forEach(f => {
     const have = !!collection[f.id];
@@ -1067,10 +1074,7 @@ function tackleBox() {
     if (b) b.onclick = () => { equip(f.id); tackleBox(); };
     grid.appendChild(card);
   });
-  document.getElementById("home").onclick = home;
 }
-
-document.getElementById("tackle").onclick = tackleBox;
 document.addEventListener("click", e => { if (e.target.closest(".btn")) sfx.click(); });
 
 const muteBtn = document.getElementById("mute");
