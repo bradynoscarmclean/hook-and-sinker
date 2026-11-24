@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Rare Catch</title>
+<title>Hook & Sinker</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Pixelify+Sans:wght@400;700&display=swap">
 <style>
@@ -28,6 +28,7 @@
   color-scheme: dark;
 }
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
 body {
   background: var(--night);
   background-image: radial-gradient(var(--panel) 1px, transparent 1px);
@@ -152,7 +153,7 @@ html:fullscreen .wrap { max-width: 980px; }
 <body>
 <div class="wrap">
   <header class="top">
-    <h1 class="logo">RARE<span>CATCH</span></h1>
+    <h1 class="logo">HOOK<span>&amp;</span>SINKER</h1>
     <div class="topright">
       <span class="stat" id="best"></span>
       <button class="btn alt" id="mute" type="button">SOUND ON</button>
@@ -997,7 +998,7 @@ function finish() {
 function showCatch(fish, isNew, score, band) {
   const r = RARITY[fish.rarity];
   const squares = game.picks.map(p => p.ans ? ["","⬜","🟩","🟦","🟪","🟧","🟨"][p.ans.tier] : "⬛").join("");
-  const share = `Rare Catch ${game.daily ? today() : "(random)"}: ${score}/${MAX}\n${squares}\nCaught: ${fish.name} (${r.name})`;
+  const share = `Hook & Sinker ${game.daily ? today() : "(random)"}: ${score}/${MAX}\n${squares}\nCaught: ${fish.name} (${r.name})`;
   sfx.fanfare(fish.rarity);
   setActions("end");
   panel.innerHTML = `
